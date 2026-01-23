@@ -175,7 +175,8 @@ pub fn run() {
         )
         .setup(|app| {
             // Create tray menu
-            let show_input = MenuItem::with_id(app, "show_input", "Show Input", true, None::<&str>)?;
+            let show_input =
+                MenuItem::with_id(app, "show_input", "Show Input", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 

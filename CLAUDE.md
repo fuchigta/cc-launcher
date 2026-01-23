@@ -60,6 +60,18 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
+## バージョン更新
+
+3ファイル（package.json, Cargo.toml, tauri.conf.json）のバージョンを一括更新する。
+
+```bash
+pnpm bump <version>
+
+# 例
+pnpm bump 1.0.0
+pnpm bump 1.0.0-beta.1
+```
+
 ## 設定ファイル
 
 設定は `%APPDATA%\cc-launcher\config.json` に保存される。

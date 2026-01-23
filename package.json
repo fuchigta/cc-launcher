@@ -1,29 +1,39 @@
 {
   "name": "cc-launcher",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "bump": "node scripts/bump-version.mjs",
+    "lint": "eslint src/",
+    "lint:ts": "tsc --noEmit",
+    "lint:rs": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
+    "fmt:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
+    "hook:post-edit": "node scripts/hook-post-edit.mjs",
+    "hook:final": "pnpm lint:ts && pnpm lint && pnpm lint:rs && pnpm fmt:rs"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-global-shortcut": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-shell": "^2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7",
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-global-shortcut": "^2",
-    "@tauri-apps/plugin-shell": "^2"
+    "react-router-dom": "^7"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@tauri-apps/cli": "^2",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.2",
     "typescript": "~5.6.2",
-    "vite": "^6.0.3",
-    "@tauri-apps/cli": "^2"
+    "typescript-eslint": "^8.53.1",
+    "vite": "^6.0.3"
   }
 }
