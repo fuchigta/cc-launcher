@@ -84,7 +84,7 @@ function Settings() {
   };
 
   const getBestTerminalLabel = (): string => {
-    const available = terminals.filter(t => t.available && t.terminal_type !== "Cmd");
+    const available = terminals.filter((t) => t.available && t.terminal_type !== "Cmd");
     if (available.length > 0) {
       return `Auto (${available[0].display_name})`;
     }
@@ -132,11 +132,7 @@ function Settings() {
         >
           <option value="Auto">{getBestTerminalLabel()}</option>
           {terminals.map((term) => (
-            <option
-              key={term.terminal_type}
-              value={term.terminal_type}
-              disabled={!term.available}
-            >
+            <option key={term.terminal_type} value={term.terminal_type} disabled={!term.available}>
               {term.display_name} {!term.available && "(not installed)"}
             </option>
           ))}

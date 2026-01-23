@@ -9,12 +9,15 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "bump": "node scripts/bump-version.mjs",
-    "lint": "eslint src/",
-    "lint:ts": "tsc --noEmit",
-    "lint:rs": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
-    "fmt:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
+    "ts:lint": "oxlint src/",
+    "ts:fmt": "oxfmt --write src/",
+    "ts:fmt:check": "oxfmt src/",
+    "ts:typecheck": "tsc --noEmit",
+    "rs:lint": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
+    "rs:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "rs:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "hook:post-edit": "node scripts/hook-post-edit.mjs",
-    "hook:final": "pnpm lint:ts && pnpm lint && pnpm lint:rs && pnpm fmt:rs"
+    "hook:final": "pnpm ts:typecheck && pnpm ts:lint && pnpm ts:fmt:check && pnpm rs:lint && pnpm rs:fmt:check"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -26,14 +29,13 @@
     "react-router-dom": "^7"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
     "@tauri-apps/cli": "^2",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "eslint": "^9.39.2",
+    "oxfmt": "^0.26.0",
+    "oxlint": "^1",
     "typescript": "~5.6.2",
-    "typescript-eslint": "^8.53.1",
     "vite": "^6.0.3"
   }
 }
