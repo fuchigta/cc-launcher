@@ -17,7 +17,8 @@
     "rs:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "rs:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "hook:post-edit": "node scripts/hook-post-edit.mjs",
-    "hook:final": "pnpm ts:typecheck && pnpm ts:lint && pnpm ts:fmt:check && pnpm rs:lint && pnpm rs:fmt:check"
+    "hook:final": "pnpm ts:typecheck && pnpm ts:lint && pnpm ts:fmt:check && pnpm rs:lint && pnpm rs:fmt:check",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -33,6 +34,7 @@
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "lefthook": "^2.0.15",
     "oxfmt": "^0.26.0",
     "oxlint": "^1",
     "typescript": "~5.6.2",

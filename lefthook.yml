@@ -1,0 +1,4 @@
+pre-commit:
+  commands:
+    hook-final:
+      run: pnpm hook:final
