@@ -3,9 +3,14 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub shortcut: String,
     pub terminal: TerminalType,
+    #[serde(default)]
+    pub last_directory: Option<String>,
+    #[serde(default)]
+    pub recent_directories: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -21,6 +26,8 @@ impl Default for AppConfig {
         Self {
             shortcut: "Ctrl+Shift+Space".to_string(),
             terminal: TerminalType::Auto,
+            last_directory: None,
+            recent_directories: Vec::new(),
         }
     }
 }

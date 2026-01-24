@@ -68,7 +68,11 @@ impl TerminalDetector {
     }
 }
 
-pub fn launch_claude(terminal: &TerminalType, prompt: &str) -> Result<(), String> {
+pub fn launch_claude(
+    terminal: &TerminalType,
+    prompt: &str,
+    working_dir: Option<&str>,
+) -> Result<(), String> {
     let escaped_prompt = prompt.replace("\"", "\\\"");
 
     let resolved_terminal = if *terminal == TerminalType::Auto {
@@ -77,46 +81,45 @@ pub fn launch_claude(terminal: &TerminalType, prompt: &str) -> Result<(), String
         terminal.clone()
     };
 
+    let mut cmd = Command::new("cmd");
+
     match resolved_terminal {
         TerminalType::Pwsh | TerminalType::Auto => {
-            Command::new("cmd")
-                .args([
-                    "/c",
-                    "start",
-                    "pwsh",
-                    "-NoExit",
-                    "-Command",
-                    &format!("claude \"{}\"", escaped_prompt),
-                ])
-                .spawn()
-                .map_err(|e| e.to_string())?;
+            cmd.args([
+                "/c",
+                "start",
+                "pwsh",
+                "-NoExit",
+                "-Command",
+                &format!("claude \"{}\"", escaped_prompt),
+            ]);
         }
         TerminalType::PowerShell => {
-            Command::new("cmd")
-                .args([
-                    "/c",
-                    "start",
-                    "powershell",
-                    "-NoExit",
-                    "-Command",
-                    &format!("claude \"{}\"", escaped_prompt),
-                ])
-                .spawn()
-                .map_err(|e| e.to_string())?;
+            cmd.args([
+                "/c",
+                "start",
+                "powershell",
+                "-NoExit",
+                "-Command",
+                &format!("claude \"{}\"", escaped_prompt),
+            ]);
         }
         TerminalType::Cmd => {
-            Command::new("cmd")
-                .args([
-                    "/c",
-                    "start",
-                    "cmd",
-                    "/k",
-                    &format!("claude \"{}\"", escaped_prompt),
-                ])
-                .spawn()
-                .map_err(|e| e.to_string())?;
+            cmd.args([
+                "/c",
+                "start",
+                "cmd",
+                "/k",
+                &format!("claude \"{}\"", escaped_prompt),
+            ]);
         }
     }
+
+    if let Some(dir) = working_dir {
+        cmd.current_dir(dir);
+    }
+
+    cmd.spawn().map_err(|e| e.to_string())?;
 
     Ok(())
 }

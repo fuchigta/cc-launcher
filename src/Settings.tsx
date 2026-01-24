@@ -67,6 +67,8 @@ function Settings() {
     const newConfig: AppConfig = {
       shortcut: shortcutInput,
       terminal: selectedTerminal,
+      lastDirectory: config.lastDirectory,
+      recentDirectories: config.recentDirectories,
     };
 
     try {

@@ -26,10 +26,32 @@ fn get_available_terminals() -> Vec<TerminalInfo> {
 }
 
 #[tauri::command]
-async fn open_claude_interactive(prompt: String) -> Result<(), String> {
+async fn open_claude_interactive(
+    prompt: String,
+    working_dir: Option<String>,
+) -> Result<(), String> {
     let config = AppConfig::load();
     let resolved_terminal = terminal::TerminalDetector::resolve(&config.terminal);
-    terminal::launch_claude(&resolved_terminal, &prompt)
+    terminal::launch_claude(&resolved_terminal, &prompt, working_dir.as_deref())
+}
+
+#[tauri::command]
+async fn update_recent_directory(directory: String) -> Result<(), String> {
+    let mut config = AppConfig::load();
+
+    // Remove if already exists
+    config.recent_directories.retain(|d| d != &directory);
+
+    // Add to front
+    config.recent_directories.insert(0, directory.clone());
+
+    // Keep only last 5
+    config.recent_directories.truncate(5);
+
+    // Update last directory
+    config.last_directory = Some(directory);
+
+    config.save()
 }
 
 #[tauri::command]
@@ -159,6 +181,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -225,7 +248,8 @@ pub fn run() {
             save_config,
             get_available_terminals,
             open_claude_interactive,
-            hide_window
+            hide_window,
+            update_recent_directory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,8 @@
 export interface AppConfig {
   shortcut: string;
   terminal: TerminalType;
+  lastDirectory: string | null;
+  recentDirectories: string[];
 }
 
 export type TerminalType = "Auto" | "Pwsh" | "PowerShell" | "Cmd";
