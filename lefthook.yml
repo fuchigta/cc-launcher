@@ -1,4 +1,12 @@
 pre-commit:
+  parallel: true
   commands:
-    hook-final:
-      run: pnpm hook:final
+    ts-check:
+      glob: "src/**/*.{ts,tsx}"
+      run: pnpm ts:typecheck && pnpm ts:lint && pnpm ts:fmt:check
+    rs-check:
+      glob: "src-tauri/**/*.rs"
+      run: pnpm rs:lint && pnpm rs:fmt:check
+    js-check:
+      glob: "scripts/**/*.{js,mjs}"
+      run: pnpm js:lint && pnpm js:fmt:check

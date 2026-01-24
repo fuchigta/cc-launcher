@@ -13,7 +13,7 @@ const filePath = data.tool_input?.file_path || "";
 if (/\.tsx?$/.test(filePath)) {
   console.log("Running TypeScript check...");
   execSync("pnpm lint:ts", { stdio: "inherit" });
-} else if (/\.rs$/.test(filePath)) {
+} else if (filePath.endsWith(".rs")) {
   console.log("Running Rust check...");
   execSync("pnpm lint:rs", { stdio: "inherit" });
 }

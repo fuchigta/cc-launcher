@@ -10,6 +10,9 @@
     "tauri": "tauri",
     "bump": "node scripts/bump-version.mjs",
     "ts:lint": "oxlint src/",
+    "js:lint": "oxlint scripts/",
+    "js:fmt": "oxfmt --write scripts/",
+    "js:fmt:check": "oxfmt scripts/",
     "ts:fmt": "oxfmt --write src/",
     "ts:fmt:check": "oxfmt src/",
     "ts:typecheck": "tsc --noEmit",
@@ -17,7 +20,7 @@
     "rs:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "rs:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "hook:post-edit": "node scripts/hook-post-edit.mjs",
-    "hook:final": "pnpm ts:typecheck && pnpm ts:lint && pnpm ts:fmt:check && pnpm rs:lint && pnpm rs:fmt:check",
+    "hook:final": "pnpm ts:typecheck && pnpm ts:lint && pnpm ts:fmt:check && pnpm js:lint && pnpm js:fmt:check && pnpm rs:lint && pnpm rs:fmt:check",
     "prepare": "lefthook install"
   },
   "dependencies": {
