@@ -60,6 +60,32 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
+## Lint/フォーマットスクリプト
+
+| スクリプト | 対象 | 説明 |
+|------------|------|------|
+| `ts:lint` | `src/` | TypeScript lint (oxlint) |
+| `ts:fmt:check` | `src/` | TypeScript フォーマットチェック |
+| `js:lint` | `scripts/` | JavaScript lint (oxlint) |
+| `js:fmt:check` | `scripts/` | JavaScript フォーマットチェック |
+| `rs:lint` | `src-tauri/` | Rust lint (clippy) |
+| `rs:fmt:check` | `src-tauri/` | Rust フォーマットチェック |
+| `hook:final` | 全体 | 上記すべてを実行 |
+
+## Hook関連ファイルの依存関係
+
+以下のファイルは同期して更新する必要がある:
+
+| ファイル | 役割 |
+|----------|------|
+| `package.json` | lintスクリプトの定義（`ts:lint`, `js:lint`, `rs:lint`等） |
+| `scripts/hook-post-edit.mjs` | 編集後に実行するlintスクリプトの呼び出し |
+
+**変更時の注意:**
+- `package.json`のスクリプト名を変更したら`hook-post-edit.mjs`も更新
+- 新しいファイルタイプを追加する場合は両ファイルに対応を追加
+- `hook:final`に追加したチェックは`hook-post-edit.mjs`にも対応を追加
+
 ## バージョン更新
 
 3ファイル（package.json, Cargo.toml, tauri.conf.json）のバージョンを一括更新する。

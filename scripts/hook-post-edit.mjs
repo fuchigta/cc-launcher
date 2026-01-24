@@ -12,8 +12,11 @@ const filePath = data.tool_input?.file_path || "";
 
 if (/\.tsx?$/.test(filePath)) {
   console.log("Running TypeScript check...");
-  execSync("pnpm lint:ts", { stdio: "inherit" });
+  execSync("pnpm ts:lint", { stdio: "inherit" });
+} else if (/\.m?js$/.test(filePath)) {
+  console.log("Running JavaScript check...");
+  execSync("pnpm js:lint", { stdio: "inherit" });
 } else if (filePath.endsWith(".rs")) {
   console.log("Running Rust check...");
-  execSync("pnpm lint:rs", { stdio: "inherit" });
+  execSync("pnpm rs:lint", { stdio: "inherit" });
 }
