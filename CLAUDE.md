@@ -35,6 +35,18 @@ pnpm bump <version> # バージョン一括更新
 - TauriコマンドはResult<T, String>で返す
 - コマンド追加時はtypes.tsも更新
 
+## 自動チェック
+
+以下のチェックはフックで自動実行される（手動実行不要）:
+
+**Write/Editツール使用後（hook:post-edit）**
+- .ts/.tsx → `pnpm ts:lint` + `pnpm ts:fmt:check`
+- .js/.mjs → `pnpm js:lint` + `pnpm js:fmt:check`
+- .rs → `pnpm rs:lint` + `pnpm rs:fmt:check`
+
+**Stop時（hook:final）**
+- セッション終了時の最終チェックが実行される
+
 ## 設定
 
 設定ファイル: `%APPDATA%\cc-launcher\config.json`

@@ -74,11 +74,10 @@ function App() {
     const currentWindow = getCurrentWindow();
     const baseHeight = 120;
     const bottomPadding = 12;
-    // Calculate dropdown height: items (40px each) + browse (40px for non-WSL) + divider (9px) + margin (4px)
+    // Calculate dropdown height: items (40px each) + browse (40px) + divider (9px) + margin (4px)
     const dirList = isWsl ? wslRecentDirectories : recentDirectories;
-    const browseHeight = isWsl ? 0 : 40;
-    const dropdownHeight =
-      dirList.length * 40 + browseHeight + (dirList.length > 0 && !isWsl ? 9 : 0) + 4;
+    const browseHeight = 40;
+    const dropdownHeight = dirList.length * 40 + browseHeight + (dirList.length > 0 ? 9 : 0) + 4;
     const expandedHeight = baseHeight + dropdownHeight + bottomPadding;
 
     if (dropdownOpen) {
@@ -200,6 +199,45 @@ function App() {
     }
   };
 
+  const handleWslBrowse = async () => {
+    isDialogOpenRef.current = true;
+    setDropdownOpen(false);
+
+    const currentWindow = getCurrentWindow();
+
+    try {
+      // Disable alwaysOnTop so dialog appears in front
+      await currentWindow.setAlwaysOnTop(false);
+
+      // Get WSL root path as default
+      const wslRoot = await invoke<string>("get_wsl_root_path");
+
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        defaultPath: wslRoot,
+      });
+
+      if (selected && typeof selected === "string") {
+        // Convert UNC path to WSL path
+        const wslPath = await invoke<string>("unc_to_wsl_path", { uncPath: selected });
+        setWslDirectory(wslPath);
+        setWslRecentDirectories((prev) => {
+          const filtered = prev.filter((d) => d !== wslPath);
+          return [wslPath, ...filtered].slice(0, 5);
+        });
+        await invoke("update_wsl_directory", { directory: wslPath });
+      }
+    } catch (error) {
+      console.error("Failed to browse WSL directory:", error);
+    } finally {
+      // Restore alwaysOnTop
+      await currentWindow.setAlwaysOnTop(true);
+      isDialogOpenRef.current = false;
+      inputRef.current?.focus();
+    }
+  };
+
   const displayDirectory = currentDirectory ?? "(No directory selected)";
   const activeDirectories = isWsl ? wslRecentDirectories : recentDirectories;
   const activeDirectory = isWsl ? wslDirectory : currentDirectory;
@@ -230,17 +268,18 @@ function App() {
                   placeholder="~ or /home/user/project"
                   className="wsl-directory-input"
                 />
-                {wslRecentDirectories.length > 0 && (
-                  <button
-                    type="button"
-                    className="wsl-dropdown-toggle"
-                    onClick={handleDirectoryClick}
-                  >
-                    <span className="dropdown-arrow">{dropdownOpen ? "\u25B2" : "\u25BC"}</span>
-                  </button>
-                )}
+                <button type="button" className="wsl-browse-button" onClick={handleWslBrowse}>
+                  Browse
+                </button>
+                <button
+                  type="button"
+                  className="wsl-dropdown-toggle"
+                  onClick={handleDirectoryClick}
+                >
+                  <span className="dropdown-arrow">{dropdownOpen ? "\u25B2" : "\u25BC"}</span>
+                </button>
               </div>
-              {dropdownOpen && wslRecentDirectories.length > 0 && (
+              {dropdownOpen && (
                 <div className="directory-dropdown">
                   {wslRecentDirectories.map((dir) => (
                     <button
@@ -253,6 +292,15 @@ function App() {
                       <span className="dropdown-item-path">{dir}</span>
                     </button>
                   ))}
+                  {wslRecentDirectories.length > 0 && <div className="dropdown-divider" />}
+                  <button
+                    type="button"
+                    className="dropdown-item browse-item"
+                    onClick={handleWslBrowse}
+                  >
+                    <span className="browse-icon">&#128194;</span>
+                    <span>Browse...</span>
+                  </button>
                 </div>
               )}
             </>

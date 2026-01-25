@@ -84,6 +84,83 @@ async fn hide_window(window: tauri::Window) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn get_wsl_root_path() -> Result<String, String> {
+    // Get the default WSL distribution name
+    let output = std::process::Command::new("wsl")
+        .args(["-l", "-q"])
+        .output()
+        .map_err(|e| format!("Failed to run wsl command: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Failed to get WSL distributions".to_string());
+    }
+
+    // wsl -l -q outputs UTF-16LE on Windows
+    let stdout = output.stdout;
+    let decoded = if stdout.len() >= 2 && stdout[0] == 0xFF && stdout[1] == 0xFE {
+        // Skip BOM
+        String::from_utf16_lossy(
+            &stdout[2..]
+                .chunks(2)
+                .filter_map(|chunk| {
+                    if chunk.len() == 2 {
+                        Some(u16::from_le_bytes([chunk[0], chunk[1]]))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<u16>>(),
+        )
+    } else {
+        // Try UTF-16LE without BOM
+        String::from_utf16_lossy(
+            &stdout
+                .chunks(2)
+                .filter_map(|chunk| {
+                    if chunk.len() == 2 {
+                        Some(u16::from_le_bytes([chunk[0], chunk[1]]))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<u16>>(),
+        )
+    };
+
+    // Get the first non-empty line (default distribution)
+    let distro = decoded
+        .lines()
+        .map(|s| s.trim().trim_matches('\0'))
+        .find(|s| !s.is_empty())
+        .ok_or_else(|| "No WSL distribution found".to_string())?;
+
+    Ok(format!("\\\\wsl.localhost\\{}", distro))
+}
+
+#[tauri::command]
+fn unc_to_wsl_path(unc_path: String) -> Result<String, String> {
+    // Handle both \\wsl.localhost\Distro\... and \\wsl$\Distro\...
+    let path = unc_path.replace('/', "\\");
+
+    let stripped = if let Some(rest) = path.strip_prefix("\\\\wsl.localhost\\") {
+        rest
+    } else if let Some(rest) = path.strip_prefix("\\\\wsl$\\") {
+        rest
+    } else {
+        return Err(format!("Not a valid WSL UNC path: {}", unc_path));
+    };
+
+    // Find the first backslash after the distro name
+    if let Some(pos) = stripped.find('\\') {
+        let wsl_path = stripped[pos..].replace('\\', "/");
+        Ok(wsl_path)
+    } else {
+        // Just the distro name, return root
+        Ok("/".to_string())
+    }
+}
+
 fn parse_shortcut(shortcut_str: &str) -> Option<Shortcut> {
     let parts: Vec<&str> = shortcut_str.split('+').collect();
     if parts.is_empty() {
@@ -275,7 +352,9 @@ pub fn run() {
             open_claude_interactive,
             hide_window,
             update_recent_directory,
-            update_wsl_directory
+            update_wsl_directory,
+            get_wsl_root_path,
+            unc_to_wsl_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
