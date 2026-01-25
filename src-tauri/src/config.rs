@@ -8,9 +8,15 @@ pub struct AppConfig {
     pub shortcut: String,
     pub terminal: TerminalType,
     #[serde(default)]
+    pub wsl_shell: WslShell,
+    #[serde(default)]
     pub last_directory: Option<String>,
     #[serde(default)]
     pub recent_directories: Vec<String>,
+    #[serde(default)]
+    pub wsl_directory: Option<String>,
+    #[serde(default)]
+    pub wsl_recent_directories: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -19,6 +25,15 @@ pub enum TerminalType {
     Pwsh,
     PowerShell,
     Cmd,
+    Wsl,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub enum WslShell {
+    #[default]
+    Bash,
+    Zsh,
+    Sh,
 }
 
 impl Default for AppConfig {
@@ -26,8 +41,11 @@ impl Default for AppConfig {
         Self {
             shortcut: "Ctrl+Shift+Space".to_string(),
             terminal: TerminalType::Auto,
+            wsl_shell: WslShell::default(),
             last_directory: None,
             recent_directories: Vec::new(),
+            wsl_directory: None,
+            wsl_recent_directories: Vec::new(),
         }
     }
 }

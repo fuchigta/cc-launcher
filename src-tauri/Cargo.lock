@@ -398,7 +398,7 @@ dependencies = [
 
 [[package]]
 name = "cc-launcher"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "dirs 5.0.1",
  "serde",

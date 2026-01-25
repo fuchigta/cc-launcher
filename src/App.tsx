@@ -2,23 +2,32 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { AppConfig } from "./types";
+import type { AppConfig, TerminalType } from "./types";
 
 function App() {
   const [prompt, setPrompt] = useState("");
+  const [terminal, setTerminal] = useState<TerminalType>("Auto");
   const [currentDirectory, setCurrentDirectory] = useState<string | null>(null);
   const [recentDirectories, setRecentDirectories] = useState<string[]>([]);
+  const [wslDirectory, setWslDirectory] = useState<string>("");
+  const [wslRecentDirectories, setWslRecentDirectories] = useState<string[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDialogOpenRef = useRef(false);
 
+  const isWsl = terminal === "Wsl";
+
   useEffect(() => {
     const loadConfig = async () => {
       const config = await invoke<AppConfig>("get_config");
+      setTerminal(config.terminal);
       setCurrentDirectory(config.lastDirectory);
       setRecentDirectories(config.recentDirectories);
+      setWslDirectory(config.wslDirectory ?? "");
+      setWslRecentDirectories(config.wslRecentDirectories ?? []);
     };
     loadConfig();
 
@@ -65,9 +74,11 @@ function App() {
     const currentWindow = getCurrentWindow();
     const baseHeight = 120;
     const bottomPadding = 12;
-    // Calculate dropdown height: items (40px each) + browse (40px) + divider (9px) + margin (4px)
+    // Calculate dropdown height: items (40px each) + browse (40px for non-WSL) + divider (9px) + margin (4px)
+    const dirList = isWsl ? wslRecentDirectories : recentDirectories;
+    const browseHeight = isWsl ? 0 : 40;
     const dropdownHeight =
-      recentDirectories.length * 40 + 40 + (recentDirectories.length > 0 ? 9 : 0) + 4;
+      dirList.length * 40 + browseHeight + (dirList.length > 0 && !isWsl ? 9 : 0) + 4;
     const expandedHeight = baseHeight + dropdownHeight + bottomPadding;
 
     if (dropdownOpen) {
@@ -75,19 +86,29 @@ function App() {
     } else {
       currentWindow.setSize(new LogicalSize(600, baseHeight));
     }
-  }, [dropdownOpen, recentDirectories.length]);
+  }, [dropdownOpen, recentDirectories.length, wslRecentDirectories.length, isWsl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (prompt.trim()) {
       try {
-        if (currentDirectory) {
-          await invoke("update_recent_directory", { directory: currentDirectory });
+        if (isWsl) {
+          if (wslDirectory.trim()) {
+            await invoke("update_wsl_directory", { directory: wslDirectory.trim() });
+          }
+          await invoke("open_claude_interactive", {
+            prompt: prompt.trim(),
+            workingDir: null,
+          });
+        } else {
+          if (currentDirectory) {
+            await invoke("update_recent_directory", { directory: currentDirectory });
+          }
+          await invoke("open_claude_interactive", {
+            prompt: prompt.trim(),
+            workingDir: currentDirectory,
+          });
         }
-        await invoke("open_claude_interactive", {
-          prompt: prompt.trim(),
-          workingDir: currentDirectory,
-        });
         setPrompt("");
         await invoke("hide_window");
       } catch (error) {
@@ -97,7 +118,10 @@ function App() {
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      formRef.current?.requestSubmit();
+    } else if (e.key === "Escape") {
       if (dropdownOpen) {
         setDropdownOpen(false);
       } else {
@@ -135,7 +159,11 @@ function App() {
   };
 
   const handleSelectDirectory = (dir: string) => {
-    setCurrentDirectory(dir);
+    if (isWsl) {
+      setWslDirectory(dir);
+    } else {
+      setCurrentDirectory(dir);
+    }
     setDropdownOpen(false);
     inputRef.current?.focus();
   };
@@ -173,10 +201,12 @@ function App() {
   };
 
   const displayDirectory = currentDirectory ?? "(No directory selected)";
+  const activeDirectories = isWsl ? wslRecentDirectories : recentDirectories;
+  const activeDirectory = isWsl ? wslDirectory : currentDirectory;
 
   return (
     <div className="overlay-container" ref={containerRef}>
-      <form onSubmit={handleSubmit} className="input-form" onBlur={handleBlur}>
+      <form ref={formRef} onSubmit={handleSubmit} className="input-form" onBlur={handleBlur}>
         <input
           ref={inputRef}
           type="text"
@@ -188,30 +218,76 @@ function App() {
           autoFocus
         />
         <div className="directory-row" ref={dropdownRef}>
-          <button type="button" className="directory-button" onClick={handleDirectoryClick}>
-            <span className="directory-icon">&#128193;</span>
-            <span className="directory-path">{displayDirectory}</span>
-            <span className="dropdown-arrow">{dropdownOpen ? "\u25B2" : "\u25BC"}</span>
-          </button>
-          {dropdownOpen && (
-            <div className="directory-dropdown">
-              {recentDirectories.map((dir) => (
-                <button
-                  type="button"
-                  key={dir}
-                  className={`dropdown-item ${dir === currentDirectory ? "active" : ""}`}
-                  onClick={() => handleSelectDirectory(dir)}
-                >
-                  {dir === currentDirectory && <span className="check-mark">&#9679;</span>}
-                  <span className="dropdown-item-path">{dir}</span>
-                </button>
-              ))}
-              {recentDirectories.length > 0 && <div className="dropdown-divider" />}
-              <button type="button" className="dropdown-item browse-item" onClick={handleBrowse}>
-                <span className="browse-icon">&#128194;</span>
-                <span>Browse...</span>
+          {isWsl ? (
+            <>
+              <div className="wsl-directory-input-wrapper">
+                <span className="directory-icon">&#128193;</span>
+                <input
+                  type="text"
+                  value={wslDirectory}
+                  onChange={(e) => setWslDirectory(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="~ or /home/user/project"
+                  className="wsl-directory-input"
+                />
+                {wslRecentDirectories.length > 0 && (
+                  <button
+                    type="button"
+                    className="wsl-dropdown-toggle"
+                    onClick={handleDirectoryClick}
+                  >
+                    <span className="dropdown-arrow">{dropdownOpen ? "\u25B2" : "\u25BC"}</span>
+                  </button>
+                )}
+              </div>
+              {dropdownOpen && wslRecentDirectories.length > 0 && (
+                <div className="directory-dropdown">
+                  {wslRecentDirectories.map((dir) => (
+                    <button
+                      type="button"
+                      key={dir}
+                      className={`dropdown-item ${dir === wslDirectory ? "active" : ""}`}
+                      onClick={() => handleSelectDirectory(dir)}
+                    >
+                      {dir === wslDirectory && <span className="check-mark">&#9679;</span>}
+                      <span className="dropdown-item-path">{dir}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <button type="button" className="directory-button" onClick={handleDirectoryClick}>
+                <span className="directory-icon">&#128193;</span>
+                <span className="directory-path">{displayDirectory}</span>
+                <span className="dropdown-arrow">{dropdownOpen ? "\u25B2" : "\u25BC"}</span>
               </button>
-            </div>
+              {dropdownOpen && (
+                <div className="directory-dropdown">
+                  {activeDirectories.map((dir) => (
+                    <button
+                      type="button"
+                      key={dir}
+                      className={`dropdown-item ${dir === activeDirectory ? "active" : ""}`}
+                      onClick={() => handleSelectDirectory(dir)}
+                    >
+                      {dir === activeDirectory && <span className="check-mark">&#9679;</span>}
+                      <span className="dropdown-item-path">{dir}</span>
+                    </button>
+                  ))}
+                  {activeDirectories.length > 0 && <div className="dropdown-divider" />}
+                  <button
+                    type="button"
+                    className="dropdown-item browse-item"
+                    onClick={handleBrowse}
+                  >
+                    <span className="browse-icon">&#128194;</span>
+                    <span>Browse...</span>
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </form>

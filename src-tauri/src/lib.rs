@@ -32,7 +32,13 @@ async fn open_claude_interactive(
 ) -> Result<(), String> {
     let config = AppConfig::load();
     let resolved_terminal = terminal::TerminalDetector::resolve(&config.terminal);
-    terminal::launch_claude(&resolved_terminal, &prompt, working_dir.as_deref())
+    terminal::launch_claude(
+        &resolved_terminal,
+        &prompt,
+        working_dir.as_deref(),
+        &config.wsl_shell,
+        config.wsl_directory.as_deref(),
+    )
 }
 
 #[tauri::command]
@@ -50,6 +56,25 @@ async fn update_recent_directory(directory: String) -> Result<(), String> {
 
     // Update last directory
     config.last_directory = Some(directory);
+
+    config.save()
+}
+
+#[tauri::command]
+async fn update_wsl_directory(directory: String) -> Result<(), String> {
+    let mut config = AppConfig::load();
+
+    // Remove if already exists
+    config.wsl_recent_directories.retain(|d| d != &directory);
+
+    // Add to front
+    config.wsl_recent_directories.insert(0, directory.clone());
+
+    // Keep only last 5
+    config.wsl_recent_directories.truncate(5);
+
+    // Update wsl directory
+    config.wsl_directory = Some(directory);
 
     config.save()
 }
@@ -249,7 +274,8 @@ pub fn run() {
             get_available_terminals,
             open_claude_interactive,
             hide_window,
-            update_recent_directory
+            update_recent_directory,
+            update_wsl_directory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

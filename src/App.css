@@ -162,6 +162,49 @@
   flex-shrink: 0;
 }
 
+/* WSL Directory Input Styles */
+.wsl-directory-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  background: rgba(30, 30, 30, 0.9);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.wsl-directory-input-wrapper .directory-icon {
+  padding-left: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.wsl-directory-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  outline: none;
+}
+
+.wsl-directory-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.wsl-dropdown-toggle {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.wsl-dropdown-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Settings Page Styles */
 .settings-container {
   padding: 24px;

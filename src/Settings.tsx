@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { AppConfig, TerminalInfo, TerminalType } from "./types";
+import type { AppConfig, TerminalInfo, TerminalType, WslShell } from "./types";
 
 function Settings() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [terminals, setTerminals] = useState<TerminalInfo[]>([]);
   const [shortcutInput, setShortcutInput] = useState("");
   const [selectedTerminal, setSelectedTerminal] = useState<TerminalType>("Auto");
+  const [selectedWslShell, setSelectedWslShell] = useState<WslShell>("Bash");
   const [status, setStatus] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
 
@@ -22,6 +23,7 @@ function Settings() {
       setConfig(cfg);
       setShortcutInput(cfg.shortcut);
       setSelectedTerminal(cfg.terminal);
+      setSelectedWslShell(cfg.wslShell ?? "Bash");
     } catch (error) {
       console.error("Failed to load config:", error);
     }
@@ -67,8 +69,11 @@ function Settings() {
     const newConfig: AppConfig = {
       shortcut: shortcutInput,
       terminal: selectedTerminal,
+      wslShell: selectedWslShell,
       lastDirectory: config.lastDirectory,
       recentDirectories: config.recentDirectories,
+      wslDirectory: config.wslDirectory,
+      wslRecentDirectories: config.wslRecentDirectories ?? [],
     };
 
     try {
@@ -140,6 +145,21 @@ function Settings() {
           ))}
         </select>
       </div>
+
+      {selectedTerminal === "Wsl" && (
+        <div className="settings-section">
+          <label>WSL Shell</label>
+          <select
+            value={selectedWslShell}
+            onChange={(e) => setSelectedWslShell(e.target.value as WslShell)}
+            className="terminal-select"
+          >
+            <option value="Bash">Bash</option>
+            <option value="Zsh">Zsh</option>
+            <option value="Sh">Sh</option>
+          </select>
+        </div>
+      )}
 
       {status && <div className="status-message">{status}</div>}
 
