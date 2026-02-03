@@ -2,8 +2,11 @@ use crate::config::{TerminalType, WslShell};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalInfo {
@@ -101,6 +104,7 @@ impl TerminalDetector {
         // pwsh (PowerShell 7+)
         let pwsh_available = Command::new("pwsh")
             .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false);
@@ -114,6 +118,7 @@ impl TerminalDetector {
         let powershell_available = Command::new("powershell")
             .arg("-Command")
             .arg("$PSVersionTable.PSVersion")
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false);
@@ -133,6 +138,7 @@ impl TerminalDetector {
         // WSL
         let wsl_available = Command::new("wsl")
             .arg("--status")
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false);
@@ -170,8 +176,6 @@ pub fn launch_claude(
     wsl_shell: &WslShell,
     wsl_directory: Option<&str>,
 ) -> Result<(), String> {
-    let escaped_prompt = prompt.replace("\"", "\\\"");
-
     let resolved_terminal = if *terminal == TerminalType::Auto {
         detect_wt_default_shell()
     } else {
@@ -188,7 +192,8 @@ pub fn launch_claude(
             let wsl_path = wsl_directory
                 .map(|s| s.to_string())
                 .or_else(|| working_dir.and_then(windows_to_wsl_path));
-            let claude_cmd = format!("claude '{}'", escaped_prompt.replace("'", "'\\''"));
+            let escaped = prompt.replace("'", "'\\''");
+            let claude_cmd = format!("claude '{}'", escaped);
             let shell_name = match wsl_shell {
                 WslShell::Bash => "bash",
                 WslShell::Zsh => "zsh",
@@ -220,7 +225,8 @@ pub fn launch_claude(
             }
         }
         TerminalType::Pwsh | TerminalType::Auto => {
-            let claude_cmd = format!("claude \"{}\"", escaped_prompt);
+            let escaped = prompt.replace("'", "''");
+            let claude_cmd = format!("claude '{}'", escaped);
             if let Some(dir) = working_dir {
                 args.extend(["-d".to_string(), dir.to_string()]);
             }
@@ -233,7 +239,8 @@ pub fn launch_claude(
             ]);
         }
         TerminalType::PowerShell => {
-            let claude_cmd = format!("claude \"{}\"", escaped_prompt);
+            let escaped = prompt.replace("'", "''");
+            let claude_cmd = format!("claude '{}'", escaped);
             if let Some(dir) = working_dir {
                 args.extend(["-d".to_string(), dir.to_string()]);
             }
@@ -246,7 +253,8 @@ pub fn launch_claude(
             ]);
         }
         TerminalType::Cmd => {
-            let claude_cmd = format!("claude \"{}\"", escaped_prompt);
+            let escaped = prompt.replace("\"", "\\\"").replace("%", "%%");
+            let claude_cmd = format!("claude \"{}\"", escaped);
             if let Some(dir) = working_dir {
                 args.extend(["-d".to_string(), dir.to_string()]);
             }

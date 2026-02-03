@@ -17,6 +17,7 @@ function App() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDialogOpenRef = useRef(false);
+  const compositionJustEndedRef = useRef(false);
 
   const isWsl = terminal === "Wsl";
 
@@ -118,6 +119,10 @@ function App() {
 
   const handleKeyDown = async (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      if (compositionJustEndedRef.current) {
+        compositionJustEndedRef.current = false;
+        return;
+      }
       e.preventDefault();
       formRef.current?.requestSubmit();
     } else if (e.key === "Escape") {
@@ -250,6 +255,9 @@ function App() {
           type="text"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
+          onCompositionEnd={() => {
+            compositionJustEndedRef.current = true;
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Ask Claude..."
           className="prompt-input"
