@@ -1,0 +1,141 @@
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import type { ExecutionLog } from "../types";
+import LogDetail from "./LogDetail";
+
+function formatSource(log: ExecutionLog): string {
+  if (log.source.type === "Schedule") return `Schedule: ${log.source.name}`;
+  if (log.source.type === "Plugin") return `Plugin: ${log.source.pluginName}`;
+  return "Manual";
+}
+
+function formatDuration(ms: number | null): string {
+  if (ms === null) return "-";
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function LogsTab() {
+  const [logs, setLogs] = useState<ExecutionLog[]>([]);
+  const [selectedLog, setSelectedLog] = useState<ExecutionLog | null>(null);
+  const [offset, setOffset] = useState(0);
+  const limit = 20;
+
+  const loadLogs = async () => {
+    try {
+      const data = await invoke<ExecutionLog[]>("get_logs", { limit, offset });
+      setLogs(data);
+    } catch (e) {
+      console.error("Failed to load logs:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadLogs();
+    const unlisten = listen("execution-completed", () => {
+      loadLogs();
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [offset]);
+
+  const handleClear = async () => {
+    try {
+      await invoke("clear_logs");
+      setLogs([]);
+      setSelectedLog(null);
+    } catch (e) {
+      console.error("Failed to clear logs:", e);
+    }
+  };
+
+  if (selectedLog) {
+    return <LogDetail log={selectedLog} onBack={() => setSelectedLog(null)} />;
+  }
+
+  return (
+    <div>
+      <div className="toolbar">
+        <span>{logs.length} log(s)</span>
+        <div className="toolbar-actions">
+          <button className="btn btn-sm btn-danger" onClick={handleClear}>
+            Clear All
+          </button>
+        </div>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="empty-state">
+          <p>No execution logs yet</p>
+        </div>
+      ) : (
+        <>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Source</th>
+                <th>Prompt</th>
+                <th>Duration</th>
+                <th>Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id} style={{ cursor: "pointer" }} onClick={() => setSelectedLog(log)}>
+                  <td>
+                    <span
+                      className={`badge ${
+                        log.status === "Success"
+                          ? "badge-success"
+                          : log.status === "Failed"
+                            ? "badge-error"
+                            : "badge-running"
+                      }`}
+                    >
+                      {log.status}
+                    </span>
+                  </td>
+                  <td>{formatSource(log)}</td>
+                  <td
+                    style={{
+                      maxWidth: 250,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {log.prompt}
+                  </td>
+                  <td>{formatDuration(log.durationMs)}</td>
+                  <td>{new Date(log.startedAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="pagination">
+            <button
+              className="btn btn-sm btn-secondary"
+              disabled={offset === 0}
+              onClick={() => setOffset(Math.max(0, offset - limit))}
+            >
+              Previous
+            </button>
+            <button
+              className="btn btn-sm btn-secondary"
+              disabled={logs.length < limit}
+              onClick={() => setOffset(offset + limit)}
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default LogsTab;

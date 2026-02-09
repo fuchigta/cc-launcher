@@ -74,6 +74,9 @@ function Settings() {
       recentDirectories: config.recentDirectories,
       wslDirectory: config.wslDirectory,
       wslRecentDirectories: config.wslRecentDirectories ?? [],
+      schedules: config.schedules ?? [],
+      plugins: config.plugins ?? [],
+      subscriptions: config.subscriptions ?? [],
     };
 
     try {

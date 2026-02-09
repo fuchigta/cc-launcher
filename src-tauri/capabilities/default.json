@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main", "settings"],
+  "windows": ["main", "settings", "manager"],
   "permissions": [
     "core:default",
     "core:window:allow-show",
@@ -19,6 +19,7 @@
     "global-shortcut:allow-unregister",
     "shell:allow-spawn",
     "shell:allow-execute",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "notification:default"
   ]
 }

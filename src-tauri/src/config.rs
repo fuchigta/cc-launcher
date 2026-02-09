@@ -1,3 +1,4 @@
+use crate::models::{PluginConfig, ScheduleConfig, SubscriptionConfig};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -17,6 +18,12 @@ pub struct AppConfig {
     pub wsl_directory: Option<String>,
     #[serde(default)]
     pub wsl_recent_directories: Vec<String>,
+    #[serde(default)]
+    pub schedules: Vec<ScheduleConfig>,
+    #[serde(default)]
+    pub plugins: Vec<PluginConfig>,
+    #[serde(default)]
+    pub subscriptions: Vec<SubscriptionConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -46,6 +53,9 @@ impl Default for AppConfig {
             recent_directories: Vec::new(),
             wsl_directory: None,
             wsl_recent_directories: Vec::new(),
+            schedules: Vec::new(),
+            plugins: Vec::new(),
+            subscriptions: Vec::new(),
         }
     }
 }
