@@ -121,19 +121,14 @@ impl PluginManager {
                     result = reader.read_line(&mut buf) => {
                         match result {
                             Ok(0) | Err(_) => {
-                                // Plugin process ended
                                 let mut handles = plugins.write().await;
                                 if let Some(handle) = handles.get_mut(&plugin_id) {
                                     handle.running = false;
                                     handle.error = Some("Process exited".to_string());
                                 }
-                                let _ = app_handle.emit("plugin-status-changed", &plugin_id);
-
                                 drop(handles);
-                                eprintln!(
-                                    "Plugin {} exited, status shows as not running",
-                                    plugin_config.name
-                                );
+                                let _ = app_handle.emit("plugin-status-changed", &plugin_id);
+                                eprintln!("Plugin {} exited", plugin_config.name);
                                 break;
                             }
                             Ok(_) => {
@@ -141,18 +136,20 @@ impl PluginManager {
                                 if trimmed.is_empty() {
                                     continue;
                                 }
-                                if let Ok(notification) = serde_json::from_str::<JsonRpcNotification>(trimmed) {
-                                    if notification.method == "event" {
-                                        if let Ok(event) = serde_json::from_value::<PluginEvent>(notification.params) {
-                                            let mut handles = plugins.write().await;
-                                            if let Some(handle) = handles.get_mut(&plugin_id) {
-                                                handle.last_event_at = Some(Utc::now());
-                                            }
-                                            drop(handles);
-                                            let _ = event_tx.send((plugin_name.clone(), event)).await;
-                                        }
-                                    }
+                                let notification = match serde_json::from_str::<JsonRpcNotification>(trimmed) {
+                                    Ok(n) if n.method == "event" => n,
+                                    _ => continue,
+                                };
+                                let event = match serde_json::from_value::<PluginEvent>(notification.params) {
+                                    Ok(e) => e,
+                                    Err(_) => continue,
+                                };
+                                let mut handles = plugins.write().await;
+                                if let Some(handle) = handles.get_mut(&plugin_id) {
+                                    handle.last_event_at = Some(Utc::now());
                                 }
+                                drop(handles);
+                                let _ = event_tx.send((plugin_name.clone(), event)).await;
                             }
                         }
                     }

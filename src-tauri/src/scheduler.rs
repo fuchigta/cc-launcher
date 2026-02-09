@@ -60,9 +60,15 @@ impl SchedulerManager {
         let schedule_id = config.id.clone();
         let schedule_name = config.name.clone();
 
-        let job = match &config.expression {
-            ScheduleExpression::Cron { expression } => {
-                Job::new_async(expression.as_str(), move |_uuid, _lock| {
+        macro_rules! make_callback {
+            () => {{
+                let app_handle = app_handle.clone();
+                let prompt = prompt.clone();
+                let working_dir = working_dir.clone();
+                let claude_args = claude_args.clone();
+                let schedule_id = schedule_id.clone();
+                let schedule_name = schedule_name.clone();
+                move |_uuid, _lock| {
                     let app = app_handle.clone();
                     let p = prompt.clone();
                     let wd = working_dir.clone();
@@ -82,33 +88,20 @@ impl SchedulerManager {
                         )
                         .await;
                     })
-                })
-                .map_err(|e| format!("Invalid cron expression: {}", e))?
+                }
+            }};
+        }
+
+        let cron_expr_owned;
+        let job = match &config.expression {
+            ScheduleExpression::Cron { expression } => {
+                Job::new_async(expression.as_str(), make_callback!())
+                    .map_err(|e| format!("Invalid cron expression: {}", e))?
             }
             ScheduleExpression::Interval { seconds } => {
                 let duration = std::time::Duration::from_secs(*seconds);
-                Job::new_repeated_async(duration, move |_uuid, _lock| {
-                    let app = app_handle.clone();
-                    let p = prompt.clone();
-                    let wd = working_dir.clone();
-                    let args = claude_args.clone();
-                    let sid = schedule_id.clone();
-                    let sname = schedule_name.clone();
-                    Box::pin(async move {
-                        let _ = headless::execute(
-                            &p,
-                            wd.as_deref(),
-                            &args,
-                            ExecutionSource::Schedule {
-                                id: sid,
-                                name: sname,
-                            },
-                            &app,
-                        )
-                        .await;
-                    })
-                })
-                .map_err(|e| format!("Invalid interval: {}", e))?
+                Job::new_repeated_async(duration, make_callback!())
+                    .map_err(|e| format!("Invalid interval: {}", e))?
             }
             ScheduleExpression::DailyAt { time } => {
                 let parts: Vec<&str> = time.split(':').collect();
@@ -121,30 +114,9 @@ impl SchedulerManager {
                 let minute: u32 = parts[1]
                     .parse()
                     .map_err(|_| format!("Invalid minute: {}", parts[1]))?;
-                let cron_expr = format!("0 {} {} * * *", minute, hour);
-
-                Job::new_async(cron_expr.as_str(), move |_uuid, _lock| {
-                    let app = app_handle.clone();
-                    let p = prompt.clone();
-                    let wd = working_dir.clone();
-                    let args = claude_args.clone();
-                    let sid = schedule_id.clone();
-                    let sname = schedule_name.clone();
-                    Box::pin(async move {
-                        let _ = headless::execute(
-                            &p,
-                            wd.as_deref(),
-                            &args,
-                            ExecutionSource::Schedule {
-                                id: sid,
-                                name: sname,
-                            },
-                            &app,
-                        )
-                        .await;
-                    })
-                })
-                .map_err(|e| format!("Invalid daily schedule: {}", e))?
+                cron_expr_owned = format!("0 {} {} * * *", minute, hour);
+                Job::new_async(cron_expr_owned.as_str(), make_callback!())
+                    .map_err(|e| format!("Invalid daily schedule: {}", e))?
             }
         };
 

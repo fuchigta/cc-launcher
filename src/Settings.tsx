@@ -67,16 +67,10 @@ function Settings() {
     if (!config) return;
 
     const newConfig: AppConfig = {
+      ...config,
       shortcut: shortcutInput,
       terminal: selectedTerminal,
       wslShell: selectedWslShell,
-      lastDirectory: config.lastDirectory,
-      recentDirectories: config.recentDirectories,
-      wslDirectory: config.wslDirectory,
-      wslRecentDirectories: config.wslRecentDirectories ?? [],
-      schedules: config.schedules ?? [],
-      plugins: config.plugins ?? [],
-      subscriptions: config.subscriptions ?? [],
     };
 
     try {

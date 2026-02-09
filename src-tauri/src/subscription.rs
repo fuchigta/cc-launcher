@@ -48,7 +48,10 @@ impl SubscriptionEngine {
             let app = app_handle.clone();
 
             tokio::spawn(async move {
-                let _ = headless::execute(&prompt, wd.as_deref(), &args, source, &app).await;
+                if let Err(e) = headless::execute(&prompt, wd.as_deref(), &args, source, &app).await
+                {
+                    eprintln!("Subscription execution failed: {}", e);
+                }
             });
         }
     }
