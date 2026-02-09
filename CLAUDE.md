@@ -22,7 +22,6 @@ pnpm bump <version> # バージョン一括更新
 |----------|---------------------|
 | バージョン更新 | package.json, Cargo.toml, tauri.conf.json（`pnpm bump`使用） |
 | Tauriコマンド追加 | src-tauri/src/lib.rs + src/types.ts |
-| Lintスクリプト変更 | package.json + scripts/hook-post-edit.mjs |
 
 ## コードスタイル
 
@@ -37,15 +36,11 @@ pnpm bump <version> # バージョン一括更新
 
 ## 自動チェック
 
-以下のチェックはフックで自動実行される（手動実行不要）:
+以下のチェックはClaude応答完了時（Stopフック）に自動実行される（手動実行不要）:
 
-**Write/Editツール使用後（hook:post-edit）**
-- .ts/.tsx → `pnpm ts:lint` + `pnpm ts:fmt:check`
-- .js/.mjs → `pnpm js:lint` + `pnpm js:fmt:check`
-- .rs → `pnpm rs:lint` + `pnpm rs:fmt:check`
-
-**Stop時（hook:final）**
-- セッション終了時の最終チェックが実行される
+- TypeScript: `pnpm ts:typecheck` + `pnpm ts:lint` + `pnpm ts:fmt:check`
+- JavaScript: `pnpm js:lint` + `pnpm js:fmt:check`
+- Rust: `pnpm rs:lint` + `pnpm rs:fmt:check`
 
 ## 設定
 

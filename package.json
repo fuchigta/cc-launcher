@@ -19,7 +19,6 @@
     "rs:lint": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
     "rs:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "rs:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
-    "hook:post-edit": "node scripts/hook-post-edit.mjs",
     "hook:final": "pnpm ts:typecheck && pnpm ts:lint && pnpm ts:fmt:check && pnpm js:lint && pnpm js:fmt:check && pnpm rs:lint && pnpm rs:fmt:check",
     "prepare": "lefthook install"
   },
