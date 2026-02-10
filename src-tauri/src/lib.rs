@@ -781,3 +781,38 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unc_to_wsl_path_localhost() {
+        let result = unc_to_wsl_path("\\\\wsl.localhost\\Ubuntu\\home\\user".to_string());
+        assert_eq!(result.unwrap(), "/home/user");
+    }
+
+    #[test]
+    fn unc_to_wsl_path_wsl_dollar() {
+        let result = unc_to_wsl_path("\\\\wsl$\\Ubuntu\\home\\user\\project".to_string());
+        assert_eq!(result.unwrap(), "/home/user/project");
+    }
+
+    #[test]
+    fn unc_to_wsl_path_root() {
+        let result = unc_to_wsl_path("\\\\wsl.localhost\\Ubuntu".to_string());
+        assert_eq!(result.unwrap(), "/");
+    }
+
+    #[test]
+    fn unc_to_wsl_path_invalid() {
+        let result = unc_to_wsl_path("C:\\Users\\test".to_string());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn unc_to_wsl_path_forward_slashes() {
+        let result = unc_to_wsl_path("//wsl.localhost/Ubuntu/home/user".to_string());
+        assert_eq!(result.unwrap(), "/home/user");
+    }
+}

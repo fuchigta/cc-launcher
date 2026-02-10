@@ -42,6 +42,20 @@ pnpm bump <version> # バージョン一括更新
 - JavaScript: `pnpm js:lint` + `pnpm js:fmt:check`
 - Rust: `pnpm rs:lint` + `pnpm rs:fmt:check`
 
+## 動作確認
+
+**テスト実行**
+```bash
+pnpm test:all       # 全テスト一括（フロントエンド + Rust）
+pnpm test           # フロントエンドテストのみ (Vitest)
+pnpm hook:final     # 静的解析全チェック
+```
+
+**UI確認（playwright-cli）**
+
+`pnpm tauri dev` 起動後、`playwright-cli` でTauri APIモックを注入してブラウザ上で確認する。
+詳細手順: [docs/ui-check.md](docs/ui-check.md)
+
 ## 設定
 
 設定ファイル: `%APPDATA%\cc-launcher\config.json`

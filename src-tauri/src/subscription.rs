@@ -71,3 +71,43 @@ fn expand_template(template: &str, data: &serde_json::Value) -> String {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expand_template_basic() {
+        let data = serde_json::json!({"name": "test"});
+        let result = expand_template("Hello {{name}}!", &data);
+        assert_eq!(result, "Hello test!");
+    }
+
+    #[test]
+    fn expand_template_multiple_placeholders() {
+        let data = serde_json::json!({"file": "main.rs", "line": "42"});
+        let result = expand_template("Error in {{file}} at line {{line}}", &data);
+        assert_eq!(result, "Error in main.rs at line 42");
+    }
+
+    #[test]
+    fn expand_template_non_string_values() {
+        let data = serde_json::json!({"count": 5, "active": true});
+        let result = expand_template("Items: {{count}}, Active: {{active}}", &data);
+        assert_eq!(result, "Items: 5, Active: true");
+    }
+
+    #[test]
+    fn expand_template_missing_key_kept() {
+        let data = serde_json::json!({"name": "test"});
+        let result = expand_template("{{name}} {{missing}}", &data);
+        assert_eq!(result, "test {{missing}}");
+    }
+
+    #[test]
+    fn expand_template_no_object_data() {
+        let data = serde_json::json!("not an object");
+        let result = expand_template("Hello {{name}}", &data);
+        assert_eq!(result, "Hello {{name}}");
+    }
+}

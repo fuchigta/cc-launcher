@@ -1,7 +1,7 @@
 {
   "name": "cc-launcher",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,10 @@
     "rs:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "rs:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "hook:final": "pnpm ts:typecheck && pnpm ts:lint && pnpm ts:fmt:check && pnpm js:lint && pnpm js:fmt:check && pnpm rs:lint && pnpm rs:fmt:check",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:all": "vitest run && cargo test --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -34,13 +37,18 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^28.0.0",
     "lefthook": "^2.0.15",
     "oxfmt": "^0.26.0",
     "oxlint": "^1",
     "typescript": "~5.6.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^4.0.18"
   }
 }
