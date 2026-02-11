@@ -89,7 +89,8 @@ fn send_notification(app_handle: &tauri::AppHandle, log: &ExecutionLog) {
     };
 
     let body = if log.stdout.len() > 200 {
-        format!("{}...", &log.stdout[..200])
+        let end = log.stdout.floor_char_boundary(200);
+        format!("{}...", &log.stdout[..end])
     } else if log.stdout.is_empty() {
         log.prompt.clone()
     } else {

@@ -398,7 +398,7 @@ dependencies = [
 
 [[package]]
 name = "cc-launcher"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "chrono",
  "dirs 5.0.1",

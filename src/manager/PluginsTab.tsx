@@ -68,10 +68,11 @@ function PluginsTab() {
   const handleToggle = async (id: string, enabled: boolean) => {
     try {
       await invoke("toggle_plugin", { id, enabled });
-      await loadPlugins();
-      await loadStatuses();
     } catch (e) {
       console.error("Failed to toggle plugin:", e);
+    } finally {
+      await loadPlugins();
+      await loadStatuses();
     }
   };
 

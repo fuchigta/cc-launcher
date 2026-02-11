@@ -218,7 +218,9 @@ async fn toggle_plugin(
     if let Some(pm) = guard.as_ref() {
         if enabled {
             let plugin = config.plugins.iter().find(|p| p.id == id).unwrap();
-            pm.start_plugin(plugin).await?;
+            if let Err(e) = pm.start_plugin(plugin).await {
+                eprintln!("Failed to start plugin {}: {}", id, e);
+            }
         } else {
             pm.stop_plugin(&id).await?;
         }
