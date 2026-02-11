@@ -58,23 +58,13 @@ pnpm hook:final     # 静的解析全チェック
 
 ## 設定
 
-設定ファイル: `%APPDATA%\cc-launcher\config.json`
+設定ファイル: `%APPDATA%\cc-launcher\config.json`（型定義: `src/types.ts` の `AppConfig`）
 
-| 項目 | 選択肢 |
-|------|--------|
-| shortcut | キーコンビネーション（デフォルト: Ctrl+Shift+Space） |
-| terminal | Auto, Pwsh, PowerShell, Cmd |
+## コード構成
 
-## ウィンドウ・コマンド
-
-| ウィンドウ | 用途 |
-|------------|------|
-| main | 入力オーバーレイ（透明、常に最前面） |
-| settings | 設定画面 |
-
-| Tauriコマンド | 説明 |
-|---------------|------|
-| get_config / save_config | 設定の取得・保存 |
-| get_available_terminals | 利用可能なターミナル一覧 |
-| open_claude_interactive | claudeコマンドをターミナルで起動 |
-| hide_window | ウィンドウを非表示 |
+| 関心事 | 参照先 |
+|--------|--------|
+| ウィンドウ定義 | `src-tauri/tauri.conf.json` |
+| Tauriコマンド | `src-tauri/src/lib.rs`（`generate_handler![]`） |
+| フロントエンドルート | `src/main.tsx` |
+| 共有型定義 | `src/types.ts` |

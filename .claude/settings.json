@@ -5,6 +5,14 @@
         "hooks": [
           { "type": "command", "command": "pnpm hook:final" }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "今回の変更でREADME.mdの内容（機能説明、設定項目、操作方法など）が実態と乖離する可能性がないか確認してください。"
+          }
+        ]
       }
     ]
   }
