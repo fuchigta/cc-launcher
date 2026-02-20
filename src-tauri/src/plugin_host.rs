@@ -4,7 +4,7 @@ use crate::models::{
 use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, RwLock};
@@ -40,7 +40,48 @@ impl PluginManager {
     pub async fn start_plugin(&self, config: &PluginConfig) -> Result<(), String> {
         self.stop_plugin(&config.id).await.ok();
 
-        let mut std_cmd = std::process::Command::new(&config.executable);
+        let exe_path = if config.executable.starts_with("sidecar:") {
+            let sidecar_name = &config.executable["sidecar:".len()..];
+            let bin_name = format!("plugins/{sidecar_name}{}", std::env::consts::EXE_SUFFIX);
+
+            // Try resource_dir first (production build)
+            let resource_path = self
+                .app_handle
+                .path()
+                .resource_dir()
+                .ok()
+                .map(|d| d.join(&bin_name));
+
+            if let Some(ref p) = resource_path {
+                if p.exists() {
+                    p.to_string_lossy().to_string()
+                } else {
+                    // Fallback: look in cargo target directory (dev mode)
+                    let dev_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("target/debug")
+                        .join(format!("{sidecar_name}{}", std::env::consts::EXE_SUFFIX));
+                    if dev_path.exists() {
+                        dev_path.to_string_lossy().to_string()
+                    } else {
+                        return Err(format!(
+                            "Sidecar binary not found: {} (tried {} and {})",
+                            sidecar_name,
+                            p.display(),
+                            dev_path.display()
+                        ));
+                    }
+                }
+            } else {
+                return Err(format!(
+                    "Failed to resolve resource dir for sidecar: {}",
+                    sidecar_name
+                ));
+            }
+        } else {
+            config.executable.clone()
+        };
+
+        let mut std_cmd = std::process::Command::new(&exe_path);
         for arg in &config.args {
             std_cmd.arg(arg);
         }
