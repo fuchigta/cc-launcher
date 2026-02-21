@@ -12,7 +12,7 @@ use serde_json::Value;
 
 // --- CLI ---
 
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 #[command(name = "imap-watcher")]
 struct Cli {
     /// IMAP server hostname
@@ -122,45 +122,29 @@ fn matches_filters(
     subject_re: &Option<Regex>,
     body_re: &Option<Regex>,
 ) -> bool {
-    if let Some(re) = subject_re {
-        if !re.is_match(subject) {
-            return false;
-        }
-    }
-    if let Some(re) = body_re {
-        if !re.is_match(body) {
-            return false;
-        }
-    }
-    true
+    let subject_ok = subject_re.as_ref().is_none_or(|re| re.is_match(subject));
+    let body_ok = body_re.as_ref().is_none_or(|re| re.is_match(body));
+    subject_ok && body_ok
 }
 
 // --- Mail parsing ---
 
+fn get_header(headers: &[mailparse::MailHeader], name: &str) -> String {
+    headers
+        .iter()
+        .find(|h| h.get_key_ref().eq_ignore_ascii_case(name))
+        .map(|h| h.get_value())
+        .unwrap_or_default()
+}
+
 fn extract_mail_data(raw: &[u8]) -> Option<Value> {
     let parsed = mailparse::parse_mail(raw).ok()?;
-
     let headers = &parsed.headers;
-    let subject = headers
-        .iter()
-        .find(|h| h.get_key_ref().eq_ignore_ascii_case("subject"))
-        .map(|h| h.get_value())
-        .unwrap_or_default();
-    let from = headers
-        .iter()
-        .find(|h| h.get_key_ref().eq_ignore_ascii_case("from"))
-        .map(|h| h.get_value())
-        .unwrap_or_default();
-    let date = headers
-        .iter()
-        .find(|h| h.get_key_ref().eq_ignore_ascii_case("date"))
-        .map(|h| h.get_value())
-        .unwrap_or_default();
-    let message_id = headers
-        .iter()
-        .find(|h| h.get_key_ref().eq_ignore_ascii_case("message-id"))
-        .map(|h| h.get_value())
-        .unwrap_or_default();
+
+    let subject = get_header(headers, "subject");
+    let from = get_header(headers, "from");
+    let date = get_header(headers, "date");
+    let message_id = get_header(headers, "message-id");
 
     let (body_text, body_html) = extract_body_parts(&parsed);
 
@@ -431,30 +415,11 @@ fn main() {
                 }
 
                 // Start watching in a separate thread
-                let cli_server = cli.server.clone();
-                let cli_port = cli.port;
-                let cli_user = cli.user.clone();
-                let cli_password = cli.password.clone();
-                let cli_folder = cli.folder.clone();
-                let cli_poll_interval = cli.poll_interval;
-                let cli_tls = cli.tls;
-                let cli_subject_match = cli.subject_match.clone();
-                let cli_body_match = cli.body_match.clone();
+                let thread_cli = cli.clone();
                 let subject_re2 = subject_re.clone();
                 let body_re2 = body_re.clone();
 
                 std::thread::spawn(move || {
-                    let thread_cli = Cli {
-                        server: cli_server,
-                        port: cli_port,
-                        user: cli_user,
-                        password: cli_password,
-                        folder: cli_folder,
-                        poll_interval: cli_poll_interval,
-                        tls: cli_tls,
-                        subject_match: cli_subject_match,
-                        body_match: cli_body_match,
-                    };
                     run_imap_watcher(&thread_cli, &subject_re2, &body_re2);
                 });
             }

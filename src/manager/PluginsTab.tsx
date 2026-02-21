@@ -47,8 +47,16 @@ function PluginsTab() {
     };
   }, [loadStatuses]);
 
-  const getStatus = (id: string): PluginStatus | undefined => {
-    return statuses.find((s) => s.id === id);
+  const getStatus = (id: string): PluginStatus | undefined => statuses.find((s) => s.id === id);
+
+  const renderStatusBadge = (status: PluginStatus | undefined): React.ReactNode => {
+    if (status?.running) {
+      return <span className="badge badge-success">Running (PID: {status.pid})</span>;
+    }
+    if (status?.error) {
+      return <span className="badge badge-error">{status.error}</span>;
+    }
+    return <span className="badge badge-running">Stopped</span>;
   };
 
   const handleRestart = async (id: string) => {
@@ -102,15 +110,7 @@ function PluginsTab() {
                   </td>
                   <td>{p.name}</td>
                   <td className="truncated-cell">{p.executable}</td>
-                  <td>
-                    {status?.running ? (
-                      <span className="badge badge-success">Running (PID: {status.pid})</span>
-                    ) : status?.error ? (
-                      <span className="badge badge-error">{status.error}</span>
-                    ) : (
-                      <span className="badge badge-running">Stopped</span>
-                    )}
-                  </td>
+                  <td>{renderStatusBadge(status)}</td>
                   <td>
                     <button
                       className="btn btn-sm btn-secondary"

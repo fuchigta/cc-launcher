@@ -1,15 +1,19 @@
 import type { ExecutionLog } from "./types";
 
 export function formatSource(log: ExecutionLog): string {
-  if (log.source.type === "Schedule") return `Schedule: ${log.source.name}`;
-  if (log.source.type === "Plugin") return `Plugin: ${log.source.pluginName}`;
-  return "Manual";
+  switch (log.source.type) {
+    case "Schedule":
+      return `Schedule: ${log.source.name}`;
+    case "Plugin":
+      return `Plugin: ${log.source.pluginName}`;
+    case "Manual":
+      return "Manual";
+  }
 }
 
 export function formatDuration(ms: number | null): string {
   if (ms === null) return "-";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
 export function splitArgs(str: string): string[] {
@@ -17,7 +21,12 @@ export function splitArgs(str: string): string[] {
 }
 
 export function statusBadgeClass(status: string): string {
-  if (status === "Success") return "badge badge-success";
-  if (status === "Failed") return "badge badge-error";
-  return "badge badge-running";
+  switch (status) {
+    case "Success":
+      return "badge badge-success";
+    case "Failed":
+      return "badge badge-error";
+    default:
+      return "badge badge-running";
+  }
 }

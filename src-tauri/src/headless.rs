@@ -42,10 +42,9 @@ pub async fn execute(
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     let exit_code = output.status.code();
 
-    let status = if output.status.success() {
-        ExecutionStatus::Success
-    } else {
-        ExecutionStatus::Failed
+    let status = match output.status.success() {
+        true => ExecutionStatus::Success,
+        false => ExecutionStatus::Failed,
     };
 
     let log = ExecutionLog {
@@ -64,11 +63,7 @@ pub async fn execute(
     };
 
     logs::write_log(&log).ok();
-
-    // Send notification
     send_notification(app_handle, &log);
-
-    // Emit event to frontend
     let _ = app_handle.emit("execution-completed", &log);
 
     Ok(log)
@@ -77,17 +72,17 @@ pub async fn execute(
 fn send_notification(app_handle: &tauri::AppHandle, log: &ExecutionLog) {
     use tauri_plugin_notification::NotificationExt;
 
-    let title = match &log.status {
+    let title = match log.status {
         ExecutionStatus::Success => "Claude Code: Success",
         ExecutionStatus::Failed => "Claude Code: Failed",
         ExecutionStatus::Running => "Claude Code: Running",
     };
 
-    let body = if log.stdout.len() > 200 {
+    let body = if log.stdout.is_empty() {
+        log.prompt.clone()
+    } else if log.stdout.len() > 200 {
         let end = log.stdout.floor_char_boundary(200);
         format!("{}...", &log.stdout[..end])
-    } else if log.stdout.is_empty() {
-        log.prompt.clone()
     } else {
         log.stdout.clone()
     };

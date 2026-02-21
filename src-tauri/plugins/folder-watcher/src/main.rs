@@ -117,26 +117,15 @@ fn build_filter_globset(filter: &Option<String>) -> Option<GlobSet> {
 }
 
 fn should_ignore(path: &Path, ignore_patterns: &[String]) -> bool {
-    for component in path.components() {
+    path.components().any(|component| {
         let name = component.as_os_str().to_string_lossy();
-        for pattern in ignore_patterns {
-            if name.as_ref() == pattern.as_str() {
-                return true;
-            }
-        }
-    }
-    false
+        ignore_patterns.iter().any(|p| name.as_ref() == p.as_str())
+    })
 }
 
 fn matches_filter(path: &Path, filter_set: &Option<GlobSet>) -> bool {
     match filter_set {
-        Some(set) => {
-            if let Some(file_name) = path.file_name() {
-                set.is_match(file_name)
-            } else {
-                false
-            }
-        }
+        Some(set) => path.file_name().is_some_and(|name| set.is_match(name)),
         None => true,
     }
 }

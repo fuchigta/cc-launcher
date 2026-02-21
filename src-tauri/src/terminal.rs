@@ -180,45 +180,25 @@ pub fn launch_claude(
                 WslShell::Sh => "sh",
             };
 
+            args.push("wsl".to_string());
             if let Some(wsl_dir) = wsl_path {
-                args.extend([
-                    "wsl".to_string(),
-                    "--cd".to_string(),
-                    wsl_dir,
-                    "--".to_string(),
-                    shell_name.to_string(),
-                    "-l".to_string(),
-                    "-i".to_string(),
-                    "-c".to_string(),
-                    claude_cmd,
-                ]);
-            } else {
-                args.extend([
-                    "wsl".to_string(),
-                    "--".to_string(),
-                    shell_name.to_string(),
-                    "-l".to_string(),
-                    "-i".to_string(),
-                    "-c".to_string(),
-                    claude_cmd,
-                ]);
-            }
-        }
-        TerminalType::Pwsh | TerminalType::Auto => {
-            let escaped = prompt.replace("'", "''");
-            let claude_cmd = format!("claude '{}'", escaped);
-            if let Some(dir) = working_dir {
-                args.extend(["-d".to_string(), dir.to_string()]);
+                args.extend(["--cd".to_string(), wsl_dir]);
             }
             args.extend([
                 "--".to_string(),
-                "pwsh".to_string(),
-                "-NoExit".to_string(),
-                "-Command".to_string(),
+                shell_name.to_string(),
+                "-l".to_string(),
+                "-i".to_string(),
+                "-c".to_string(),
                 claude_cmd,
             ]);
         }
-        TerminalType::PowerShell => {
+        TerminalType::Pwsh | TerminalType::PowerShell | TerminalType::Auto => {
+            let shell = if resolved_terminal == TerminalType::PowerShell {
+                "powershell"
+            } else {
+                "pwsh"
+            };
             let escaped = prompt.replace("'", "''");
             let claude_cmd = format!("claude '{}'", escaped);
             if let Some(dir) = working_dir {
@@ -226,7 +206,7 @@ pub fn launch_claude(
             }
             args.extend([
                 "--".to_string(),
-                "powershell".to_string(),
+                shell.to_string(),
                 "-NoExit".to_string(),
                 "-Command".to_string(),
                 claude_cmd,

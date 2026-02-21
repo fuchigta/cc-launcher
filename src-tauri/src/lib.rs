@@ -212,8 +212,8 @@ async fn delete_plugin(app_handle: tauri::AppHandle, id: String) -> Result<(), S
     with_config(|c| {
         c.plugins.retain(|p| p.id != id);
         Ok(())
-    })?;
-    Ok(())
+    })
+    .map(|_| ())
 }
 
 #[tauri::command]
@@ -250,10 +250,9 @@ async fn toggle_plugin(
 async fn get_plugin_statuses(app_handle: tauri::AppHandle) -> Result<Vec<PluginStatus>, String> {
     let state = app_handle.state::<AppState>();
     let guard = state.plugin_manager.read().await;
-    if let Some(pm) = guard.as_ref() {
-        Ok(pm.get_statuses().await)
-    } else {
-        Ok(Vec::new())
+    match guard.as_ref() {
+        Some(pm) => Ok(pm.get_statuses().await),
+        None => Ok(Vec::new()),
     }
 }
 
@@ -373,8 +372,8 @@ async fn update_recent_directory(directory: String) -> Result<(), String> {
     with_config(|c| {
         update_directory_list(&mut c.recent_directories, &mut c.last_directory, directory);
         Ok(())
-    })?;
-    Ok(())
+    })
+    .map(|_| ())
 }
 
 #[tauri::command]
@@ -386,8 +385,8 @@ async fn update_wsl_directory(directory: String) -> Result<(), String> {
             directory,
         );
         Ok(())
-    })?;
-    Ok(())
+    })
+    .map(|_| ())
 }
 
 #[tauri::command]
@@ -407,10 +406,7 @@ fn get_wsl_root_path() -> Result<String, String> {
         return Err("Failed to get WSL distributions".to_string());
     }
 
-    // wsl -l -q outputs UTF-16LE on Windows
     let decoded = decode_utf16le(&output.stdout);
-
-    // Get the first non-empty line (default distribution)
     let distro = decoded
         .lines()
         .map(|s| s.trim().trim_matches('\0'))

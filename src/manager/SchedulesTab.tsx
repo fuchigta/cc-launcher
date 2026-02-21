@@ -5,10 +5,14 @@ import ScheduleForm from "./ScheduleForm";
 
 function formatExpression(schedule: ScheduleConfig): string {
   const expr = schedule.expression;
-  if (expr.type === "Cron") return `Cron: ${expr.expression}`;
-  if (expr.type === "Interval") return `Every ${expr.seconds}s`;
-  if (expr.type === "DailyAt") return `Daily at ${expr.time}`;
-  return "Unknown";
+  switch (expr.type) {
+    case "Cron":
+      return `Cron: ${expr.expression}`;
+    case "Interval":
+      return `Every ${expr.seconds}s`;
+    case "DailyAt":
+      return `Daily at ${expr.time}`;
+  }
 }
 
 function SchedulesTab() {

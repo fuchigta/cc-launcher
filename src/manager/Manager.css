@@ -292,6 +292,14 @@
   margin-bottom: 16px;
 }
 
+.log-section-title {
+  margin-bottom: 8px;
+}
+
+.log-section-title-first {
+  margin-top: 20px;
+}
+
 .log-output {
   background: #111;
   border-radius: 8px;
