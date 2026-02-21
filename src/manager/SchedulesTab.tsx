@@ -116,16 +116,7 @@ function SchedulesTab() {
                 </td>
                 <td>{s.name}</td>
                 <td>{formatExpression(s)}</td>
-                <td
-                  style={{
-                    maxWidth: 200,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {s.prompt}
-                </td>
+                <td className="truncated-cell">{s.prompt}</td>
                 <td>
                   <button className="btn btn-sm btn-secondary" onClick={() => handleTestRun(s.id)}>
                     Run

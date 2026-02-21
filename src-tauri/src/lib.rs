@@ -71,6 +71,35 @@ async fn clear_logs() -> Result<(), String> {
     logs::clear_logs()
 }
 
+// --- Config helpers ---
+
+fn with_config<F>(updater: F) -> Result<AppConfig, String>
+where
+    F: FnOnce(&mut AppConfig) -> Result<(), String>,
+{
+    let mut config = AppConfig::load();
+    updater(&mut config)?;
+    config.save()?;
+    Ok(config)
+}
+
+async fn reload_scheduler(app: &tauri::AppHandle, config: &AppConfig) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let guard = state.scheduler.read().await;
+    if let Some(sched) = guard.as_ref() {
+        sched.reload_all(&config.schedules).await?;
+    }
+    Ok(())
+}
+
+async fn reload_subscriptions(app: &tauri::AppHandle, config: &AppConfig) {
+    let state = app.state::<AppState>();
+    let guard = state.subscription_engine.read().await;
+    if let Some(engine) = guard.as_ref() {
+        engine.reload(config.subscriptions.clone()).await;
+    }
+}
+
 // --- Schedule commands ---
 
 #[tauri::command]
@@ -83,34 +112,24 @@ async fn save_schedule(
     app_handle: tauri::AppHandle,
     schedule: ScheduleConfig,
 ) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    if let Some(existing) = config.schedules.iter_mut().find(|s| s.id == schedule.id) {
-        *existing = schedule;
-    } else {
-        config.schedules.push(schedule);
-    }
-    config.save()?;
-
-    let state = app_handle.state::<AppState>();
-    let guard = state.scheduler.read().await;
-    if let Some(sched) = guard.as_ref() {
-        sched.reload_all(&config.schedules).await?;
-    }
-    Ok(())
+    let config = with_config(|c| {
+        if let Some(existing) = c.schedules.iter_mut().find(|s| s.id == schedule.id) {
+            *existing = schedule.clone();
+        } else {
+            c.schedules.push(schedule.clone());
+        }
+        Ok(())
+    })?;
+    reload_scheduler(&app_handle, &config).await
 }
 
 #[tauri::command]
 async fn delete_schedule(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    config.schedules.retain(|s| s.id != id);
-    config.save()?;
-
-    let state = app_handle.state::<AppState>();
-    let guard = state.scheduler.read().await;
-    if let Some(sched) = guard.as_ref() {
-        sched.reload_all(&config.schedules).await?;
-    }
-    Ok(())
+    let config = with_config(|c| {
+        c.schedules.retain(|s| s.id != id);
+        Ok(())
+    })?;
+    reload_scheduler(&app_handle, &config).await
 }
 
 #[tauri::command]
@@ -119,20 +138,15 @@ async fn toggle_schedule(
     id: String,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    if let Some(schedule) = config.schedules.iter_mut().find(|s| s.id == id) {
-        schedule.enabled = enabled;
-    } else {
-        return Err("Schedule not found".to_string());
-    }
-    config.save()?;
-
-    let state = app_handle.state::<AppState>();
-    let guard = state.scheduler.read().await;
-    if let Some(sched) = guard.as_ref() {
-        sched.reload_all(&config.schedules).await?;
-    }
-    Ok(())
+    let config = with_config(|c| {
+        if let Some(schedule) = c.schedules.iter_mut().find(|s| s.id == id) {
+            schedule.enabled = enabled;
+            Ok(())
+        } else {
+            Err("Schedule not found".to_string())
+        }
+    })?;
+    reload_scheduler(&app_handle, &config).await
 }
 
 #[tauri::command]
@@ -167,13 +181,14 @@ fn get_plugins() -> Vec<PluginConfig> {
 
 #[tauri::command]
 async fn save_plugin(app_handle: tauri::AppHandle, plugin: PluginConfig) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    if let Some(existing) = config.plugins.iter_mut().find(|p| p.id == plugin.id) {
-        *existing = plugin;
-    } else {
-        config.plugins.push(plugin);
-    }
-    config.save()?;
+    let config = with_config(|c| {
+        if let Some(existing) = c.plugins.iter_mut().find(|p| p.id == plugin.id) {
+            *existing = plugin.clone();
+        } else {
+            c.plugins.push(plugin.clone());
+        }
+        Ok(())
+    })?;
 
     // Restart all plugins
     let state = app_handle.state::<AppState>();
@@ -194,9 +209,11 @@ async fn delete_plugin(app_handle: tauri::AppHandle, id: String) -> Result<(), S
     }
     drop(guard);
 
-    let mut config = AppConfig::load();
-    config.plugins.retain(|p| p.id != id);
-    config.save()
+    with_config(|c| {
+        c.plugins.retain(|p| p.id != id);
+        Ok(())
+    })?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -205,13 +222,14 @@ async fn toggle_plugin(
     id: String,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    if let Some(plugin) = config.plugins.iter_mut().find(|p| p.id == id) {
-        plugin.enabled = enabled;
-    } else {
-        return Err("Plugin not found".to_string());
-    }
-    config.save()?;
+    let config = with_config(|c| {
+        if let Some(plugin) = c.plugins.iter_mut().find(|p| p.id == id) {
+            plugin.enabled = enabled;
+            Ok(())
+        } else {
+            Err("Plugin not found".to_string())
+        }
+    })?;
 
     let state = app_handle.state::<AppState>();
     let guard = state.plugin_manager.read().await;
@@ -270,37 +288,25 @@ async fn save_subscription(
     app_handle: tauri::AppHandle,
     subscription: SubscriptionConfig,
 ) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    if let Some(existing) = config
-        .subscriptions
-        .iter_mut()
-        .find(|s| s.id == subscription.id)
-    {
-        *existing = subscription;
-    } else {
-        config.subscriptions.push(subscription);
-    }
-    config.save()?;
-
-    let state = app_handle.state::<AppState>();
-    let guard = state.subscription_engine.read().await;
-    if let Some(engine) = guard.as_ref() {
-        engine.reload(config.subscriptions).await;
-    }
+    let config = with_config(|c| {
+        if let Some(existing) = c.subscriptions.iter_mut().find(|s| s.id == subscription.id) {
+            *existing = subscription.clone();
+        } else {
+            c.subscriptions.push(subscription.clone());
+        }
+        Ok(())
+    })?;
+    reload_subscriptions(&app_handle, &config).await;
     Ok(())
 }
 
 #[tauri::command]
 async fn delete_subscription(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    config.subscriptions.retain(|s| s.id != id);
-    config.save()?;
-
-    let state = app_handle.state::<AppState>();
-    let guard = state.subscription_engine.read().await;
-    if let Some(engine) = guard.as_ref() {
-        engine.reload(config.subscriptions).await;
-    }
+    let config = with_config(|c| {
+        c.subscriptions.retain(|s| s.id != id);
+        Ok(())
+    })?;
+    reload_subscriptions(&app_handle, &config).await;
     Ok(())
 }
 
@@ -310,19 +316,15 @@ async fn toggle_subscription(
     id: String,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut config = AppConfig::load();
-    if let Some(sub) = config.subscriptions.iter_mut().find(|s| s.id == id) {
-        sub.enabled = enabled;
-    } else {
-        return Err("Subscription not found".to_string());
-    }
-    config.save()?;
-
-    let state = app_handle.state::<AppState>();
-    let guard = state.subscription_engine.read().await;
-    if let Some(engine) = guard.as_ref() {
-        engine.reload(config.subscriptions).await;
-    }
+    let config = with_config(|c| {
+        if let Some(sub) = c.subscriptions.iter_mut().find(|s| s.id == id) {
+            sub.enabled = enabled;
+            Ok(())
+        } else {
+            Err("Subscription not found".to_string())
+        }
+    })?;
+    reload_subscriptions(&app_handle, &config).await;
     Ok(())
 }
 
@@ -359,42 +361,33 @@ async fn open_claude_interactive(
     )
 }
 
+fn update_directory_list(list: &mut Vec<String>, last: &mut Option<String>, directory: String) {
+    list.retain(|d| d != &directory);
+    list.insert(0, directory.clone());
+    list.truncate(5);
+    *last = Some(directory);
+}
+
 #[tauri::command]
 async fn update_recent_directory(directory: String) -> Result<(), String> {
-    let mut config = AppConfig::load();
-
-    // Remove if already exists
-    config.recent_directories.retain(|d| d != &directory);
-
-    // Add to front
-    config.recent_directories.insert(0, directory.clone());
-
-    // Keep only last 5
-    config.recent_directories.truncate(5);
-
-    // Update last directory
-    config.last_directory = Some(directory);
-
-    config.save()
+    with_config(|c| {
+        update_directory_list(&mut c.recent_directories, &mut c.last_directory, directory);
+        Ok(())
+    })?;
+    Ok(())
 }
 
 #[tauri::command]
 async fn update_wsl_directory(directory: String) -> Result<(), String> {
-    let mut config = AppConfig::load();
-
-    // Remove if already exists
-    config.wsl_recent_directories.retain(|d| d != &directory);
-
-    // Add to front
-    config.wsl_recent_directories.insert(0, directory.clone());
-
-    // Keep only last 5
-    config.wsl_recent_directories.truncate(5);
-
-    // Update wsl directory
-    config.wsl_directory = Some(directory);
-
-    config.save()
+    with_config(|c| {
+        update_directory_list(
+            &mut c.wsl_recent_directories,
+            &mut c.wsl_directory,
+            directory,
+        );
+        Ok(())
+    })?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -417,36 +410,7 @@ fn get_wsl_root_path() -> Result<String, String> {
     }
 
     // wsl -l -q outputs UTF-16LE on Windows
-    let stdout = output.stdout;
-    let decoded = if stdout.len() >= 2 && stdout[0] == 0xFF && stdout[1] == 0xFE {
-        // Skip BOM
-        String::from_utf16_lossy(
-            &stdout[2..]
-                .chunks(2)
-                .filter_map(|chunk| {
-                    if chunk.len() == 2 {
-                        Some(u16::from_le_bytes([chunk[0], chunk[1]]))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<u16>>(),
-        )
-    } else {
-        // Try UTF-16LE without BOM
-        String::from_utf16_lossy(
-            &stdout
-                .chunks(2)
-                .filter_map(|chunk| {
-                    if chunk.len() == 2 {
-                        Some(u16::from_le_bytes([chunk[0], chunk[1]]))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<u16>>(),
-        )
-    };
+    let decoded = decode_utf16le(&output.stdout);
 
     // Get the first non-empty line (default distribution)
     let distro = decoded
@@ -479,6 +443,20 @@ fn unc_to_wsl_path(unc_path: String) -> Result<String, String> {
         // Just the distro name, return root
         Ok("/".to_string())
     }
+}
+
+fn decode_utf16le(bytes: &[u8]) -> String {
+    let start = if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
+        2
+    } else {
+        0
+    };
+    String::from_utf16_lossy(
+        &bytes[start..]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect::<Vec<_>>(),
+    )
 }
 
 fn parse_key_code(key: &str) -> Option<Code> {
@@ -573,8 +551,8 @@ fn parse_shortcut(shortcut_str: &str) -> Option<Shortcut> {
     key_code.map(|code| Shortcut::new(Some(modifiers), code))
 }
 
-fn show_main_window<R: Runtime>(app: &tauri::AppHandle<R>) {
-    if let Some(window) = app.get_webview_window("main") {
+fn show_window<R: Runtime>(app: &tauri::AppHandle<R>, label: &str) {
+    if let Some(window) = app.get_webview_window(label) {
         let _ = window.center();
         let _ = window.show();
         let _ = window.set_focus();
@@ -590,22 +568,6 @@ fn toggle_main_window<R: Runtime>(app: &tauri::AppHandle<R>) {
             let _ = window.show();
             let _ = window.set_focus();
         }
-    }
-}
-
-fn show_settings_window<R: Runtime>(app: &tauri::AppHandle<R>) {
-    if let Some(window) = app.get_webview_window("settings") {
-        let _ = window.center();
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-}
-
-fn show_manager_window<R: Runtime>(app: &tauri::AppHandle<R>) {
-    if let Some(window) = app.get_webview_window("manager") {
-        let _ = window.center();
-        let _ = window.show();
-        let _ = window.set_focus();
     }
 }
 
@@ -652,13 +614,13 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show_input" => {
-                        show_main_window(app);
+                        show_window(app, "main");
                     }
                     "manager" => {
-                        show_manager_window(app);
+                        show_window(app, "manager");
                     }
                     "settings" => {
-                        show_settings_window(app);
+                        show_window(app, "settings");
                     }
                     "quit" => {
                         app.exit(0);

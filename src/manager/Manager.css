@@ -331,6 +331,21 @@
   margin-bottom: 16px;
 }
 
+/* Truncated cell */
+.truncated-cell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.truncated-cell-wide {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Pagination */
 .pagination {
   display: flex;

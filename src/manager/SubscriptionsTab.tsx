@@ -102,16 +102,7 @@ function SubscriptionsTab() {
                 <td>{s.name}</td>
                 <td>{s.pluginName}</td>
                 <td>{s.eventType}</td>
-                <td
-                  style={{
-                    maxWidth: 200,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {s.promptTemplate}
-                </td>
+                <td className="truncated-cell">{s.promptTemplate}</td>
                 <td>
                   <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(s)}>
                     Edit

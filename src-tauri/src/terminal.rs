@@ -95,60 +95,44 @@ fn windows_to_wsl_path(windows_path: &str) -> Option<String> {
     }
 }
 
+fn command_available(cmd: &str, args: &[&str]) -> bool {
+    Command::new(cmd)
+        .args(args)
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
 pub struct TerminalDetector;
 
 impl TerminalDetector {
     pub fn detect_available() -> Vec<TerminalInfo> {
-        let mut terminals = Vec::new();
-
-        // pwsh (PowerShell 7+)
-        let pwsh_available = Command::new("pwsh")
-            .arg("--version")
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        terminals.push(TerminalInfo {
-            terminal_type: TerminalType::Pwsh,
-            display_name: "PowerShell 7+ (pwsh)".to_string(),
-            available: pwsh_available,
-        });
-
-        // powershell (Windows PowerShell)
-        let powershell_available = Command::new("powershell")
-            .arg("-Command")
-            .arg("$PSVersionTable.PSVersion")
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        terminals.push(TerminalInfo {
-            terminal_type: TerminalType::PowerShell,
-            display_name: "Windows PowerShell".to_string(),
-            available: powershell_available,
-        });
-
-        // cmd is always available on Windows
-        terminals.push(TerminalInfo {
-            terminal_type: TerminalType::Cmd,
-            display_name: "Command Prompt (cmd)".to_string(),
-            available: true,
-        });
-
-        // WSL
-        let wsl_available = Command::new("wsl")
-            .arg("--status")
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        terminals.push(TerminalInfo {
-            terminal_type: TerminalType::Wsl,
-            display_name: "WSL".to_string(),
-            available: wsl_available,
-        });
-
-        terminals
+        vec![
+            TerminalInfo {
+                terminal_type: TerminalType::Pwsh,
+                display_name: "PowerShell 7+ (pwsh)".to_string(),
+                available: command_available("pwsh", &["--version"]),
+            },
+            TerminalInfo {
+                terminal_type: TerminalType::PowerShell,
+                display_name: "Windows PowerShell".to_string(),
+                available: command_available(
+                    "powershell",
+                    &["-Command", "$PSVersionTable.PSVersion"],
+                ),
+            },
+            TerminalInfo {
+                terminal_type: TerminalType::Cmd,
+                display_name: "Command Prompt (cmd)".to_string(),
+                available: true,
+            },
+            TerminalInfo {
+                terminal_type: TerminalType::Wsl,
+                display_name: "WSL".to_string(),
+                available: command_available("wsl", &["--status"]),
+            },
+        ]
     }
 
     pub fn get_best() -> TerminalType {

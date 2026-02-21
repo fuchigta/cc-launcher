@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import type { SubscriptionConfig } from "../types";
+import { splitArgs } from "../utils";
+import FormModal from "./FormModal";
+import DirectoryInput from "./DirectoryInput";
 
 interface SubscriptionFormProps {
   subscription: SubscriptionConfig | null;
@@ -28,7 +30,6 @@ function SubscriptionForm({ subscription, onSave, onCancel }: SubscriptionFormPr
   }, [subscription]);
 
   const handleSubmit = () => {
-    const args = claudeArgs.trim() ? claudeArgs.trim().split(/\s+/) : [];
     onSave({
       id: subscription?.id ?? crypto.randomUUID(),
       name,
@@ -36,110 +37,72 @@ function SubscriptionForm({ subscription, onSave, onCancel }: SubscriptionFormPr
       eventType,
       promptTemplate,
       workingDir: workingDir || null,
-      claudeArgs: args,
+      claudeArgs: splitArgs(claudeArgs),
       enabled: subscription?.enabled ?? true,
     });
   };
 
   return (
-    <div className="form-overlay" onClick={onCancel}>
-      <div className="form-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{subscription ? "Edit Subscription" : "New Subscription"}</h3>
-
-        <div className="form-group">
-          <label>Name</label>
-          <input
-            className="form-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="My subscription"
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Plugin Name (or * for all)</label>
-          <input
-            className="form-input"
-            value={pluginName}
-            onChange={(e) => setPluginName(e.target.value)}
-            placeholder="my-plugin"
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Event Type (or * for all)</label>
-          <input
-            className="form-input"
-            value={eventType}
-            onChange={(e) => setEventType(e.target.value)}
-            placeholder="file_created"
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Prompt Template</label>
-          <textarea
-            className="form-textarea"
-            value={promptTemplate}
-            onChange={(e) => setPromptTemplate(e.target.value)}
-            placeholder={
-              "Use {{key}} for event data variables\ne.g. Review the file at {{file_path}}"
-            }
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Working Directory</label>
-          <div className="input-with-button">
-            <input
-              className="form-input"
-              value={workingDir}
-              onChange={(e) => setWorkingDir(e.target.value)}
-              placeholder="C:\path\to\project (optional)"
-            />
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={async () => {
-                const selected = await open({
-                  directory: true,
-                  multiple: false,
-                  defaultPath: workingDir || undefined,
-                });
-                if (selected && typeof selected === "string") {
-                  setWorkingDir(selected);
-                }
-              }}
-            >
-              Browse
-            </button>
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label>Extra Claude Args</label>
-          <input
-            className="form-input"
-            value={claudeArgs}
-            onChange={(e) => setClaudeArgs(e.target.value)}
-            placeholder="--model sonnet (optional)"
-          />
-        </div>
-
-        <div className="form-actions">
-          <button className="btn btn-secondary" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleSubmit}
-            disabled={!name || !pluginName || !promptTemplate}
-          >
-            Save
-          </button>
-        </div>
+    <FormModal
+      title={subscription ? "Edit Subscription" : "New Subscription"}
+      onCancel={onCancel}
+      onSave={handleSubmit}
+      saveDisabled={!name || !pluginName || !promptTemplate}
+    >
+      <div className="form-group">
+        <label>Name</label>
+        <input
+          className="form-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="My subscription"
+        />
       </div>
-    </div>
+
+      <div className="form-group">
+        <label>Plugin Name (or * for all)</label>
+        <input
+          className="form-input"
+          value={pluginName}
+          onChange={(e) => setPluginName(e.target.value)}
+          placeholder="my-plugin"
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Event Type (or * for all)</label>
+        <input
+          className="form-input"
+          value={eventType}
+          onChange={(e) => setEventType(e.target.value)}
+          placeholder="file_created"
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Prompt Template</label>
+        <textarea
+          className="form-textarea"
+          value={promptTemplate}
+          onChange={(e) => setPromptTemplate(e.target.value)}
+          placeholder={
+            "Use {{key}} for event data variables\ne.g. Review the file at {{file_path}}"
+          }
+        />
+      </div>
+
+      <DirectoryInput value={workingDir} onChange={setWorkingDir} />
+
+      <div className="form-group">
+        <label>Extra Claude Args</label>
+        <input
+          className="form-input"
+          value={claudeArgs}
+          onChange={(e) => setClaudeArgs(e.target.value)}
+          placeholder="--model sonnet (optional)"
+        />
+      </div>
+    </FormModal>
   );
 }
 

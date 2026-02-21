@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import type { PluginConfig } from "../types";
+import { splitArgs } from "../utils";
+import FormModal from "./FormModal";
 
 type PluginPreset = "custom" | "folder-watcher" | "imap-watcher";
 
@@ -349,7 +351,7 @@ function PluginForm({ plugin, onSave, onCancel }: PluginFormProps) {
     } else if (preset === "imap-watcher") {
       finalArgs = buildImapWatcherArgs(imapState);
     } else {
-      finalArgs = args.trim() ? args.trim().split(/\s+/) : [];
+      finalArgs = splitArgs(args);
     }
 
     onSave({
@@ -370,73 +372,65 @@ function PluginForm({ plugin, onSave, onCancel }: PluginFormProps) {
   };
 
   return (
-    <div className="form-overlay" onClick={onCancel}>
-      <div className="form-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{plugin ? "Edit Plugin" : "New Plugin"}</h3>
-
-        <div className="form-group">
-          <label>Type</label>
-          <select
-            className="form-select"
-            value={preset}
-            onChange={(e) => handlePresetChange(e.target.value as PluginPreset)}
-          >
-            <option value="custom">Custom</option>
-            <option value="folder-watcher">Folder Watcher (built-in)</option>
-            <option value="imap-watcher">IMAP Watcher (built-in)</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Name</label>
-          <input
-            className="form-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="My plugin"
-          />
-        </div>
-
-        {preset === "custom" && (
-          <>
-            <div className="form-group">
-              <label>Executable</label>
-              <input
-                className="form-input"
-                value={executable}
-                onChange={(e) => setExecutable(e.target.value)}
-                placeholder="C:\path\to\plugin.exe or node"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Arguments</label>
-              <input
-                className="form-input"
-                value={args}
-                onChange={(e) => setArgs(e.target.value)}
-                placeholder="script.js --watch (optional)"
-              />
-            </div>
-          </>
-        )}
-
-        {preset === "folder-watcher" && (
-          <FolderWatcherForm state={folderState} onChange={setFolderState} />
-        )}
-
-        {preset === "imap-watcher" && <ImapWatcherForm state={imapState} onChange={setImapState} />}
-
-        <div className="form-actions">
-          <button className="btn btn-secondary" onClick={onCancel}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleSubmit} disabled={!isValid()}>
-            Save
-          </button>
-        </div>
+    <FormModal
+      title={plugin ? "Edit Plugin" : "New Plugin"}
+      onCancel={onCancel}
+      onSave={handleSubmit}
+      saveDisabled={!isValid()}
+    >
+      <div className="form-group">
+        <label>Type</label>
+        <select
+          className="form-select"
+          value={preset}
+          onChange={(e) => handlePresetChange(e.target.value as PluginPreset)}
+        >
+          <option value="custom">Custom</option>
+          <option value="folder-watcher">Folder Watcher (built-in)</option>
+          <option value="imap-watcher">IMAP Watcher (built-in)</option>
+        </select>
       </div>
-    </div>
+
+      <div className="form-group">
+        <label>Name</label>
+        <input
+          className="form-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="My plugin"
+        />
+      </div>
+
+      {preset === "custom" && (
+        <>
+          <div className="form-group">
+            <label>Executable</label>
+            <input
+              className="form-input"
+              value={executable}
+              onChange={(e) => setExecutable(e.target.value)}
+              placeholder="C:\path\to\plugin.exe or node"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Arguments</label>
+            <input
+              className="form-input"
+              value={args}
+              onChange={(e) => setArgs(e.target.value)}
+              placeholder="script.js --watch (optional)"
+            />
+          </div>
+        </>
+      )}
+
+      {preset === "folder-watcher" && (
+        <FolderWatcherForm state={folderState} onChange={setFolderState} />
+      )}
+
+      {preset === "imap-watcher" && <ImapWatcherForm state={imapState} onChange={setImapState} />}
+    </FormModal>
   );
 }
 

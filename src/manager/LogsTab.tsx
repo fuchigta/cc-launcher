@@ -2,19 +2,8 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ExecutionLog } from "../types";
+import { formatSource, formatDuration, statusBadgeClass } from "../utils";
 import LogDetail from "./LogDetail";
-
-function formatSource(log: ExecutionLog): string {
-  if (log.source.type === "Schedule") return `Schedule: ${log.source.name}`;
-  if (log.source.type === "Plugin") return `Plugin: ${log.source.pluginName}`;
-  return "Manual";
-}
-
-function formatDuration(ms: number | null): string {
-  if (ms === null) return "-";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
 
 function LogsTab() {
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
@@ -86,29 +75,10 @@ function LogsTab() {
               {logs.map((log) => (
                 <tr key={log.id} style={{ cursor: "pointer" }} onClick={() => setSelectedLog(log)}>
                   <td>
-                    <span
-                      className={`badge ${
-                        log.status === "Success"
-                          ? "badge-success"
-                          : log.status === "Failed"
-                            ? "badge-error"
-                            : "badge-running"
-                      }`}
-                    >
-                      {log.status}
-                    </span>
+                    <span className={statusBadgeClass(log.status)}>{log.status}</span>
                   </td>
                   <td>{formatSource(log)}</td>
-                  <td
-                    style={{
-                      maxWidth: 250,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {log.prompt}
-                  </td>
+                  <td className="truncated-cell-wide">{log.prompt}</td>
                   <td>{formatDuration(log.durationMs)}</td>
                   <td>{new Date(log.startedAt).toLocaleString()}</td>
                 </tr>

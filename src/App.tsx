@@ -172,71 +172,46 @@ function App() {
     inputRef.current?.focus();
   };
 
-  const handleBrowse = async () => {
+  const handleBrowse = async (forWsl: boolean) => {
     isDialogOpenRef.current = true;
     setDropdownOpen(false);
 
     const currentWindow = getCurrentWindow();
 
     try {
-      // Disable alwaysOnTop so dialog appears in front
       await currentWindow.setAlwaysOnTop(false);
+
+      const defaultPath = forWsl
+        ? await invoke<string>("get_wsl_root_path")
+        : (currentDirectory ?? undefined);
 
       const selected = await open({
         directory: true,
         multiple: false,
-        defaultPath: currentDirectory ?? undefined,
+        defaultPath,
       });
 
       if (selected && typeof selected === "string") {
-        setCurrentDirectory(selected);
-        setRecentDirectories((prev) => {
-          const filtered = prev.filter((d) => d !== selected);
-          return [selected, ...filtered].slice(0, 5);
-        });
-        await invoke("update_recent_directory", { directory: selected });
-      }
-    } finally {
-      // Restore alwaysOnTop
-      await currentWindow.setAlwaysOnTop(true);
-      isDialogOpenRef.current = false;
-      inputRef.current?.focus();
-    }
-  };
-
-  const handleWslBrowse = async () => {
-    isDialogOpenRef.current = true;
-    setDropdownOpen(false);
-
-    const currentWindow = getCurrentWindow();
-
-    try {
-      // Disable alwaysOnTop so dialog appears in front
-      await currentWindow.setAlwaysOnTop(false);
-
-      // Get WSL root path as default
-      const wslRoot = await invoke<string>("get_wsl_root_path");
-
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        defaultPath: wslRoot,
-      });
-
-      if (selected && typeof selected === "string") {
-        // Convert UNC path to WSL path
-        const wslPath = await invoke<string>("unc_to_wsl_path", { uncPath: selected });
-        setWslDirectory(wslPath);
-        setWslRecentDirectories((prev) => {
-          const filtered = prev.filter((d) => d !== wslPath);
-          return [wslPath, ...filtered].slice(0, 5);
-        });
-        await invoke("update_wsl_directory", { directory: wslPath });
+        if (forWsl) {
+          const wslPath = await invoke<string>("unc_to_wsl_path", { uncPath: selected });
+          setWslDirectory(wslPath);
+          setWslRecentDirectories((prev) => {
+            const filtered = prev.filter((d) => d !== wslPath);
+            return [wslPath, ...filtered].slice(0, 5);
+          });
+          await invoke("update_wsl_directory", { directory: wslPath });
+        } else {
+          setCurrentDirectory(selected);
+          setRecentDirectories((prev) => {
+            const filtered = prev.filter((d) => d !== selected);
+            return [selected, ...filtered].slice(0, 5);
+          });
+          await invoke("update_recent_directory", { directory: selected });
+        }
       }
     } catch (error) {
-      console.error("Failed to browse WSL directory:", error);
+      console.error("Failed to browse directory:", error);
     } finally {
-      // Restore alwaysOnTop
       await currentWindow.setAlwaysOnTop(true);
       isDialogOpenRef.current = false;
       inputRef.current?.focus();
@@ -246,6 +221,27 @@ function App() {
   const displayDirectory = currentDirectory ?? "(No directory selected)";
   const activeDirectories = isWsl ? wslRecentDirectories : recentDirectories;
   const activeDirectory = isWsl ? wslDirectory : currentDirectory;
+
+  const renderDropdown = (dirs: string[], activeDir: string | null, onBrowse: () => void) => (
+    <div className="directory-dropdown">
+      {dirs.map((dir) => (
+        <button
+          type="button"
+          key={dir}
+          className={`dropdown-item ${dir === activeDir ? "active" : ""}`}
+          onClick={() => handleSelectDirectory(dir)}
+        >
+          {dir === activeDir && <span className="check-mark">&#9679;</span>}
+          <span className="dropdown-item-path">{dir}</span>
+        </button>
+      ))}
+      {dirs.length > 0 && <div className="dropdown-divider" />}
+      <button type="button" className="dropdown-item browse-item" onClick={onBrowse}>
+        <span className="browse-icon">&#128194;</span>
+        <span>Browse...</span>
+      </button>
+    </div>
+  );
 
   return (
     <div className="overlay-container" ref={containerRef}>
@@ -276,7 +272,11 @@ function App() {
                   placeholder="~ or /home/user/project"
                   className="wsl-directory-input"
                 />
-                <button type="button" className="wsl-browse-button" onClick={handleWslBrowse}>
+                <button
+                  type="button"
+                  className="wsl-browse-button"
+                  onClick={() => handleBrowse(true)}
+                >
                   Browse
                 </button>
                 <button
@@ -287,30 +287,8 @@ function App() {
                   <span className="dropdown-arrow">{dropdownOpen ? "\u25B2" : "\u25BC"}</span>
                 </button>
               </div>
-              {dropdownOpen && (
-                <div className="directory-dropdown">
-                  {wslRecentDirectories.map((dir) => (
-                    <button
-                      type="button"
-                      key={dir}
-                      className={`dropdown-item ${dir === wslDirectory ? "active" : ""}`}
-                      onClick={() => handleSelectDirectory(dir)}
-                    >
-                      {dir === wslDirectory && <span className="check-mark">&#9679;</span>}
-                      <span className="dropdown-item-path">{dir}</span>
-                    </button>
-                  ))}
-                  {wslRecentDirectories.length > 0 && <div className="dropdown-divider" />}
-                  <button
-                    type="button"
-                    className="dropdown-item browse-item"
-                    onClick={handleWslBrowse}
-                  >
-                    <span className="browse-icon">&#128194;</span>
-                    <span>Browse...</span>
-                  </button>
-                </div>
-              )}
+              {dropdownOpen &&
+                renderDropdown(wslRecentDirectories, wslDirectory, () => handleBrowse(true))}
             </>
           ) : (
             <>
@@ -319,30 +297,8 @@ function App() {
                 <span className="directory-path">{displayDirectory}</span>
                 <span className="dropdown-arrow">{dropdownOpen ? "\u25B2" : "\u25BC"}</span>
               </button>
-              {dropdownOpen && (
-                <div className="directory-dropdown">
-                  {activeDirectories.map((dir) => (
-                    <button
-                      type="button"
-                      key={dir}
-                      className={`dropdown-item ${dir === activeDirectory ? "active" : ""}`}
-                      onClick={() => handleSelectDirectory(dir)}
-                    >
-                      {dir === activeDirectory && <span className="check-mark">&#9679;</span>}
-                      <span className="dropdown-item-path">{dir}</span>
-                    </button>
-                  ))}
-                  {activeDirectories.length > 0 && <div className="dropdown-divider" />}
-                  <button
-                    type="button"
-                    className="dropdown-item browse-item"
-                    onClick={handleBrowse}
-                  >
-                    <span className="browse-icon">&#128194;</span>
-                    <span>Browse...</span>
-                  </button>
-                </div>
-              )}
+              {dropdownOpen &&
+                renderDropdown(activeDirectories, activeDirectory, () => handleBrowse(false))}
             </>
           )}
         </div>

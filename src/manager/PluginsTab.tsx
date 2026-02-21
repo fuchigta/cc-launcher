@@ -136,16 +136,7 @@ function PluginsTab() {
                     />
                   </td>
                   <td>{p.name}</td>
-                  <td
-                    style={{
-                      maxWidth: 200,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {p.executable}
-                  </td>
+                  <td className="truncated-cell">{p.executable}</td>
                   <td>
                     {status?.running ? (
                       <span className="badge badge-success">Running (PID: {status.pid})</span>
