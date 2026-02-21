@@ -1,64 +1,24 @@
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import type { SubscriptionConfig } from "../types";
+import { useCrudTab } from "../hooks/useCrudTab";
 import SubscriptionForm from "./SubscriptionForm";
 
 function SubscriptionsTab() {
-  const [subscriptions, setSubscriptions] = useState<SubscriptionConfig[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingSub, setEditingSub] = useState<SubscriptionConfig | null>(null);
-
-  const loadSubscriptions = async () => {
-    try {
-      const data = await invoke<SubscriptionConfig[]>("get_subscriptions");
-      setSubscriptions(data);
-    } catch (e) {
-      console.error("Failed to load subscriptions:", e);
-    }
-  };
-
-  useEffect(() => {
-    loadSubscriptions();
-  }, []);
-
-  const handleSave = async (subscription: SubscriptionConfig) => {
-    try {
-      await invoke("save_subscription", { subscription });
-      setShowForm(false);
-      setEditingSub(null);
-      await loadSubscriptions();
-    } catch (e) {
-      console.error("Failed to save subscription:", e);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await invoke("delete_subscription", { id });
-      await loadSubscriptions();
-    } catch (e) {
-      console.error("Failed to delete subscription:", e);
-    }
-  };
-
-  const handleToggle = async (id: string, enabled: boolean) => {
-    try {
-      await invoke("toggle_subscription", { id, enabled });
-      await loadSubscriptions();
-    } catch (e) {
-      console.error("Failed to toggle subscription:", e);
-    }
-  };
-
-  const handleEdit = (sub: SubscriptionConfig) => {
-    setEditingSub(sub);
-    setShowForm(true);
-  };
-
-  const handleNew = () => {
-    setEditingSub(null);
-    setShowForm(true);
-  };
+  const {
+    items: subscriptions,
+    showForm,
+    editingItem: editingSub,
+    handleSave,
+    handleDelete,
+    handleToggle,
+    handleEdit,
+    handleNew,
+    closeForm,
+  } = useCrudTab<SubscriptionConfig>({
+    get: "get_subscriptions",
+    save: "save_subscription",
+    delete: "delete_subscription",
+    toggle: "toggle_subscription",
+  });
 
   return (
     <div>
@@ -120,11 +80,8 @@ function SubscriptionsTab() {
       {showForm && (
         <SubscriptionForm
           subscription={editingSub}
-          onSave={handleSave}
-          onCancel={() => {
-            setShowForm(false);
-            setEditingSub(null);
-          }}
+          onSave={(subscription) => handleSave("subscription", subscription)}
+          onCancel={closeForm}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { ScheduleConfig } from "../types";
+import { useCrudTab } from "../hooks/useCrudTab";
 import ScheduleForm from "./ScheduleForm";
 
 function formatExpression(schedule: ScheduleConfig): string {
@@ -12,51 +12,22 @@ function formatExpression(schedule: ScheduleConfig): string {
 }
 
 function SchedulesTab() {
-  const [schedules, setSchedules] = useState<ScheduleConfig[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState<ScheduleConfig | null>(null);
-
-  const loadSchedules = async () => {
-    try {
-      const data = await invoke<ScheduleConfig[]>("get_schedules");
-      setSchedules(data);
-    } catch (e) {
-      console.error("Failed to load schedules:", e);
-    }
-  };
-
-  useEffect(() => {
-    loadSchedules();
-  }, []);
-
-  const handleSave = async (schedule: ScheduleConfig) => {
-    try {
-      await invoke("save_schedule", { schedule });
-      setShowForm(false);
-      setEditingSchedule(null);
-      await loadSchedules();
-    } catch (e) {
-      console.error("Failed to save schedule:", e);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await invoke("delete_schedule", { id });
-      await loadSchedules();
-    } catch (e) {
-      console.error("Failed to delete schedule:", e);
-    }
-  };
-
-  const handleToggle = async (id: string, enabled: boolean) => {
-    try {
-      await invoke("toggle_schedule", { id, enabled });
-      await loadSchedules();
-    } catch (e) {
-      console.error("Failed to toggle schedule:", e);
-    }
-  };
+  const {
+    items: schedules,
+    showForm,
+    editingItem: editingSchedule,
+    handleSave,
+    handleDelete,
+    handleToggle,
+    handleEdit,
+    handleNew,
+    closeForm,
+  } = useCrudTab<ScheduleConfig>({
+    get: "get_schedules",
+    save: "save_schedule",
+    delete: "delete_schedule",
+    toggle: "toggle_schedule",
+  });
 
   const handleTestRun = async (id: string) => {
     try {
@@ -64,16 +35,6 @@ function SchedulesTab() {
     } catch (e) {
       console.error("Failed to test run schedule:", e);
     }
-  };
-
-  const handleEdit = (schedule: ScheduleConfig) => {
-    setEditingSchedule(schedule);
-    setShowForm(true);
-  };
-
-  const handleNew = () => {
-    setEditingSchedule(null);
-    setShowForm(true);
   };
 
   return (
@@ -137,11 +98,8 @@ function SchedulesTab() {
       {showForm && (
         <ScheduleForm
           schedule={editingSchedule}
-          onSave={handleSave}
-          onCancel={() => {
-            setShowForm(false);
-            setEditingSchedule(null);
-          }}
+          onSave={(schedule) => handleSave("schedule", schedule)}
+          onCancel={closeForm}
         />
       )}
     </div>

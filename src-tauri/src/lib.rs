@@ -6,8 +6,8 @@ mod plugin_host;
 mod scheduler;
 mod subscription;
 mod terminal;
+mod windows_util;
 
-use std::os::windows::process::CommandExt;
 use std::sync::Arc;
 
 use config::AppConfig;
@@ -398,10 +398,8 @@ async fn hide_window(window: tauri::Window) -> Result<(), String> {
 #[tauri::command]
 fn get_wsl_root_path() -> Result<String, String> {
     // Get the default WSL distribution name
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-    let output = std::process::Command::new("wsl")
+    let output = windows_util::no_window_command("wsl")
         .args(["-l", "-q"])
-        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to run wsl command: {}", e))?;
 

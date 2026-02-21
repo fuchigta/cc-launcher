@@ -2,11 +2,8 @@ use crate::config::{TerminalType, WslShell};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
-
-const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalInfo {
@@ -96,9 +93,8 @@ fn windows_to_wsl_path(windows_path: &str) -> Option<String> {
 }
 
 fn command_available(cmd: &str, args: &[&str]) -> bool {
-    Command::new(cmd)
+    crate::windows_util::no_window_command(cmd)
         .args(args)
-        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)

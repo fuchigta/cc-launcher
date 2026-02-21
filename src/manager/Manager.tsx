@@ -7,44 +7,32 @@ import "./Manager.css";
 
 type Tab = "schedules" | "plugins" | "subscriptions" | "logs";
 
+const tabs: { key: Tab; label: string; component: React.FC }[] = [
+  { key: "schedules", label: "Schedules", component: SchedulesTab },
+  { key: "plugins", label: "Plugins", component: PluginsTab },
+  { key: "subscriptions", label: "Subscriptions", component: SubscriptionsTab },
+  { key: "logs", label: "Logs", component: LogsTab },
+];
+
 function Manager() {
   const [activeTab, setActiveTab] = useState<Tab>("schedules");
+  const ActiveComponent = tabs.find((t) => t.key === activeTab)?.component;
 
   return (
     <div className="manager-container">
       <h2>Manager</h2>
       <div className="tab-nav">
-        <button
-          className={`tab-button ${activeTab === "schedules" ? "active" : ""}`}
-          onClick={() => setActiveTab("schedules")}
-        >
-          Schedules
-        </button>
-        <button
-          className={`tab-button ${activeTab === "plugins" ? "active" : ""}`}
-          onClick={() => setActiveTab("plugins")}
-        >
-          Plugins
-        </button>
-        <button
-          className={`tab-button ${activeTab === "subscriptions" ? "active" : ""}`}
-          onClick={() => setActiveTab("subscriptions")}
-        >
-          Subscriptions
-        </button>
-        <button
-          className={`tab-button ${activeTab === "logs" ? "active" : ""}`}
-          onClick={() => setActiveTab("logs")}
-        >
-          Logs
-        </button>
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            className={`tab-button ${activeTab === tab.key ? "active" : ""}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
-      <div>
-        {activeTab === "schedules" && <SchedulesTab />}
-        {activeTab === "plugins" && <PluginsTab />}
-        {activeTab === "subscriptions" && <SubscriptionsTab />}
-        {activeTab === "logs" && <LogsTab />}
-      </div>
+      <div>{ActiveComponent && <ActiveComponent />}</div>
     </div>
   );
 }

@@ -1,35 +1,43 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { PluginConfig, PluginStatus } from "../types";
+import { useCrudTab } from "../hooks/useCrudTab";
 import PluginForm from "./PluginForm";
 
 function PluginsTab() {
-  const [plugins, setPlugins] = useState<PluginConfig[]>([]);
   const [statuses, setStatuses] = useState<PluginStatus[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingPlugin, setEditingPlugin] = useState<PluginConfig | null>(null);
 
-  const loadPlugins = async () => {
-    try {
-      const data = await invoke<PluginConfig[]>("get_plugins");
-      setPlugins(data);
-    } catch (e) {
-      console.error("Failed to load plugins:", e);
-    }
-  };
-
-  const loadStatuses = async () => {
+  const loadStatuses = useCallback(async () => {
     try {
       const data = await invoke<PluginStatus[]>("get_plugin_statuses");
       setStatuses(data);
     } catch (e) {
       console.error("Failed to load plugin statuses:", e);
     }
-  };
+  }, []);
+
+  const {
+    items: plugins,
+    showForm,
+    editingItem: editingPlugin,
+    handleSave,
+    handleDelete,
+    handleToggle,
+    handleEdit,
+    handleNew,
+    closeForm,
+  } = useCrudTab<PluginConfig>(
+    {
+      get: "get_plugins",
+      save: "save_plugin",
+      delete: "delete_plugin",
+      toggle: "toggle_plugin",
+    },
+    loadStatuses,
+  );
 
   useEffect(() => {
-    loadPlugins();
     loadStatuses();
     const unlisten = listen("plugin-status-changed", () => {
       loadStatuses();
@@ -37,43 +45,10 @@ function PluginsTab() {
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [loadStatuses]);
 
   const getStatus = (id: string): PluginStatus | undefined => {
     return statuses.find((s) => s.id === id);
-  };
-
-  const handleSave = async (plugin: PluginConfig) => {
-    try {
-      await invoke("save_plugin", { plugin });
-      setShowForm(false);
-      setEditingPlugin(null);
-      await loadPlugins();
-      await loadStatuses();
-    } catch (e) {
-      console.error("Failed to save plugin:", e);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await invoke("delete_plugin", { id });
-      await loadPlugins();
-      await loadStatuses();
-    } catch (e) {
-      console.error("Failed to delete plugin:", e);
-    }
-  };
-
-  const handleToggle = async (id: string, enabled: boolean) => {
-    try {
-      await invoke("toggle_plugin", { id, enabled });
-    } catch (e) {
-      console.error("Failed to toggle plugin:", e);
-    } finally {
-      await loadPlugins();
-      await loadStatuses();
-    }
   };
 
   const handleRestart = async (id: string) => {
@@ -83,16 +58,6 @@ function PluginsTab() {
     } catch (e) {
       console.error("Failed to restart plugin:", e);
     }
-  };
-
-  const handleEdit = (plugin: PluginConfig) => {
-    setEditingPlugin(plugin);
-    setShowForm(true);
-  };
-
-  const handleNew = () => {
-    setEditingPlugin(null);
-    setShowForm(true);
   };
 
   return (
@@ -170,11 +135,8 @@ function PluginsTab() {
       {showForm && (
         <PluginForm
           plugin={editingPlugin}
-          onSave={handleSave}
-          onCancel={() => {
-            setShowForm(false);
-            setEditingPlugin(null);
-          }}
+          onSave={(plugin) => handleSave("plugin", plugin)}
+          onCancel={closeForm}
         />
       )}
     </div>

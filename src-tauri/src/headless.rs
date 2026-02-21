@@ -4,8 +4,6 @@ use chrono::Utc;
 use tauri::Emitter;
 use uuid::Uuid;
 
-const CREATE_NO_WINDOW: u32 = 0x08000000;
-
 pub async fn execute(
     prompt: &str,
     working_dir: Option<&str>,
@@ -16,15 +14,12 @@ pub async fn execute(
     let id = Uuid::new_v4().to_string();
     let started_at = Utc::now();
 
-    let mut std_cmd = std::process::Command::new("claude");
+    let mut std_cmd = crate::windows_util::no_window_command("claude");
     std_cmd.arg("--print");
     std_cmd.arg(prompt);
     for arg in claude_args {
         std_cmd.arg(arg);
     }
-
-    use std::os::windows::process::CommandExt;
-    std_cmd.creation_flags(CREATE_NO_WINDOW);
 
     std_cmd.stdout(std::process::Stdio::piped());
     std_cmd.stderr(std::process::Stdio::piped());

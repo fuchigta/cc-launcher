@@ -81,14 +81,11 @@ impl PluginManager {
             config.executable.clone()
         };
 
-        let mut std_cmd = std::process::Command::new(&exe_path);
+        let mut std_cmd = crate::windows_util::no_window_command(&exe_path);
         for arg in &config.args {
             std_cmd.arg(arg);
         }
 
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        use std::os::windows::process::CommandExt;
-        std_cmd.creation_flags(CREATE_NO_WINDOW);
         std_cmd.stdin(std::process::Stdio::piped());
         std_cmd.stdout(std::process::Stdio::piped());
         std_cmd.stderr(std::process::Stdio::null());
