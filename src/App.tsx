@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { AppConfig, TerminalType } from "./types";
+import type { TerminalType } from "./types";
+import {
+  getConfig,
+  updateWslDirectory,
+  openClaudeInteractive,
+  updateRecentDirectory,
+  hideWindow,
+  getWslRootPath,
+  uncToWslPath,
+} from "./commands";
 
 function App() {
   const [prompt, setPrompt] = useState("");
@@ -23,7 +31,7 @@ function App() {
 
   useEffect(() => {
     const loadConfig = async () => {
-      const config = await invoke<AppConfig>("get_config");
+      const config = await getConfig();
       setTerminal(config.terminal);
       setCurrentDirectory(config.lastDirectory);
       setRecentDirectories(config.recentDirectories);
@@ -94,23 +102,17 @@ function App() {
       try {
         if (isWsl) {
           if (wslDirectory.trim()) {
-            await invoke("update_wsl_directory", { directory: wslDirectory.trim() });
+            await updateWslDirectory(wslDirectory.trim());
           }
-          await invoke("open_claude_interactive", {
-            prompt: prompt.trim(),
-            workingDir: null,
-          });
+          await openClaudeInteractive(prompt.trim(), null);
         } else {
           if (currentDirectory) {
-            await invoke("update_recent_directory", { directory: currentDirectory });
+            await updateRecentDirectory(currentDirectory);
           }
-          await invoke("open_claude_interactive", {
-            prompt: prompt.trim(),
-            workingDir: currentDirectory,
-          });
+          await openClaudeInteractive(prompt.trim(), currentDirectory);
         }
         setPrompt("");
-        await invoke("hide_window");
+        await hideWindow();
       } catch (error) {
         console.error("Failed to launch Claude:", error);
       }
@@ -130,7 +132,7 @@ function App() {
         setDropdownOpen(false);
       } else {
         setPrompt("");
-        await invoke("hide_window");
+        await hideWindow();
       }
     }
   };
@@ -153,7 +155,7 @@ function App() {
       if (!isFocused) {
         setPrompt("");
         setDropdownOpen(false);
-        await invoke("hide_window");
+        await hideWindow();
       }
     }, 100);
   };
@@ -181,9 +183,7 @@ function App() {
     try {
       await currentWindow.setAlwaysOnTop(false);
 
-      const defaultPath = forWsl
-        ? await invoke<string>("get_wsl_root_path")
-        : (currentDirectory ?? undefined);
+      const defaultPath = forWsl ? await getWslRootPath() : (currentDirectory ?? undefined);
 
       const selected = await open({
         directory: true,
@@ -193,20 +193,20 @@ function App() {
 
       if (selected && typeof selected === "string") {
         if (forWsl) {
-          const wslPath = await invoke<string>("unc_to_wsl_path", { uncPath: selected });
+          const wslPath = await uncToWslPath(selected);
           setWslDirectory(wslPath);
           setWslRecentDirectories((prev) => {
             const filtered = prev.filter((d) => d !== wslPath);
             return [wslPath, ...filtered].slice(0, 5);
           });
-          await invoke("update_wsl_directory", { directory: wslPath });
+          await updateWslDirectory(wslPath);
         } else {
           setCurrentDirectory(selected);
           setRecentDirectories((prev) => {
             const filtered = prev.filter((d) => d !== selected);
             return [selected, ...filtered].slice(0, 5);
           });
-          await invoke("update_recent_directory", { directory: selected });
+          await updateRecentDirectory(selected);
         }
       }
     } catch (error) {

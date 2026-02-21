@@ -1,19 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { invoke } from "@tauri-apps/api/core";
 // getCurrentWindow mock is a singleton defined in setup.ts
 import Settings from "../Settings";
 import type { AppConfig } from "../types";
-
-const mockedInvoke = vi.mocked(invoke);
+import { commandMocks } from "./setup";
 
 // mock reset is handled in setup.ts
 
 describe("Settings", () => {
   it("config読み込み前にLoading...が表示される", () => {
-    // Make invoke hang so config never loads
-    mockedInvoke.mockImplementation(() => new Promise(() => {}));
+    // Make getConfig hang so config never loads
+    commandMocks.getConfig.mockImplementation(() => new Promise(() => {}));
     render(<Settings />);
     expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
@@ -30,7 +28,7 @@ describe("Settings", () => {
     expect(screen.getByDisplayValue("Ctrl+Shift+Space")).toBeInTheDocument();
   });
 
-  it("get_available_terminalsの結果がselectに反映される", async () => {
+  it("getAvailableTerminalsの結果がselectに反映される", async () => {
     render(<Settings />);
 
     await waitFor(() => {
@@ -58,7 +56,7 @@ describe("Settings", () => {
     expect(screen.getByText("Recording...")).toBeInTheDocument();
   });
 
-  it("Save実行でsave_configがinvokeされる", async () => {
+  it("Save実行でsaveConfigが呼ばれる", async () => {
     const user = userEvent.setup();
     render(<Settings />);
 
@@ -69,13 +67,10 @@ describe("Settings", () => {
     await user.click(screen.getByText("Save"));
 
     await waitFor(() => {
-      expect(mockedInvoke).toHaveBeenCalledWith(
-        "save_config",
+      expect(commandMocks.saveConfig).toHaveBeenCalledWith(
         expect.objectContaining({
-          newConfig: expect.objectContaining({
-            shortcut: "Ctrl+Shift+Space",
-            terminal: "Auto",
-          }),
+          shortcut: "Ctrl+Shift+Space",
+          terminal: "Auto",
         }),
       );
     });
@@ -99,26 +94,22 @@ describe("Settings", () => {
   });
 
   it("terminal=Wslの時にWSL Shell selectが表示される", async () => {
-    mockedInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_config") {
-        return Promise.resolve({
-          shortcut: "Ctrl+Shift+Space",
-          terminal: "Wsl",
-          wslShell: "Bash",
-          lastDirectory: null,
-          recentDirectories: [],
-          wslDirectory: null,
-          wslRecentDirectories: [],
-          schedules: [],
-          plugins: [],
-          subscriptions: [],
-        } as AppConfig);
-      }
-      if (cmd === "get_available_terminals") {
-        return Promise.resolve([{ terminal_type: "Wsl", display_name: "WSL", available: true }]);
-      }
-      return Promise.resolve(null);
-    });
+    commandMocks.getConfig.mockResolvedValue({
+      shortcut: "Ctrl+Shift+Space",
+      terminal: "Wsl",
+      wslShell: "Bash",
+      lastDirectory: null,
+      recentDirectories: [],
+      wslDirectory: null,
+      wslRecentDirectories: [],
+      schedules: [],
+      plugins: [],
+      subscriptions: [],
+    } as AppConfig);
+
+    commandMocks.getAvailableTerminals.mockResolvedValue([
+      { terminal_type: "Wsl", display_name: "WSL", available: true },
+    ]);
 
     render(<Settings />);
 

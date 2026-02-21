@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppConfig, TerminalInfo, TerminalType, WslShell } from "./types";
+import { getConfig, saveConfig, getAvailableTerminals } from "./commands";
 
 function Settings() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -19,7 +19,7 @@ function Settings() {
 
   const loadConfig = async () => {
     try {
-      const cfg = await invoke<AppConfig>("get_config");
+      const cfg = await getConfig();
       setConfig(cfg);
       setShortcutInput(cfg.shortcut);
       setSelectedTerminal(cfg.terminal);
@@ -31,7 +31,7 @@ function Settings() {
 
   const loadTerminals = async () => {
     try {
-      const terms = await invoke<TerminalInfo[]>("get_available_terminals");
+      const terms = await getAvailableTerminals();
       setTerminals(terms);
     } catch (error) {
       console.error("Failed to load terminals:", error);
@@ -74,7 +74,7 @@ function Settings() {
     };
 
     try {
-      await invoke("save_config", { newConfig });
+      await saveConfig(newConfig);
       setStatus("Settings saved! Restart to apply shortcut changes.");
       setTimeout(() => setStatus(""), 3000);
     } catch (error) {

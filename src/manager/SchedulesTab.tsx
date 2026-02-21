@@ -1,6 +1,12 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { ScheduleConfig } from "../types";
 import { useCrudTab } from "../hooks/useCrudTab";
+import {
+  getSchedules,
+  saveSchedule,
+  deleteSchedule,
+  toggleSchedule,
+  testRunSchedule,
+} from "../commands";
 import ScheduleForm from "./ScheduleForm";
 
 function formatExpression(schedule: ScheduleConfig): string {
@@ -27,15 +33,15 @@ function SchedulesTab() {
     handleNew,
     closeForm,
   } = useCrudTab<ScheduleConfig>({
-    get: "get_schedules",
-    save: "save_schedule",
-    delete: "delete_schedule",
-    toggle: "toggle_schedule",
+    getAll: getSchedules,
+    save: saveSchedule,
+    delete: deleteSchedule,
+    toggle: toggleSchedule,
   });
 
   const handleTestRun = async (id: string) => {
     try {
-      await invoke("test_run_schedule", { id });
+      await testRunSchedule(id);
     } catch (e) {
       console.error("Failed to test run schedule:", e);
     }
@@ -102,7 +108,7 @@ function SchedulesTab() {
       {showForm && (
         <ScheduleForm
           schedule={editingSchedule}
-          onSave={(schedule) => handleSave("schedule", schedule)}
+          onSave={(schedule) => handleSave(schedule)}
           onCancel={closeForm}
         />
       )}

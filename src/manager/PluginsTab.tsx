@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { PluginConfig, PluginStatus } from "../types";
 import { useCrudTab } from "../hooks/useCrudTab";
+import {
+  getPlugins,
+  savePlugin,
+  deletePlugin,
+  togglePlugin,
+  getPluginStatuses,
+  restartPlugin,
+} from "../commands";
 import PluginForm from "./PluginForm";
 
 function PluginsTab() {
@@ -10,7 +17,7 @@ function PluginsTab() {
 
   const loadStatuses = useCallback(async () => {
     try {
-      const data = await invoke<PluginStatus[]>("get_plugin_statuses");
+      const data = await getPluginStatuses();
       setStatuses(data);
     } catch (e) {
       console.error("Failed to load plugin statuses:", e);
@@ -29,10 +36,10 @@ function PluginsTab() {
     closeForm,
   } = useCrudTab<PluginConfig>(
     {
-      get: "get_plugins",
-      save: "save_plugin",
-      delete: "delete_plugin",
-      toggle: "toggle_plugin",
+      getAll: getPlugins,
+      save: savePlugin,
+      delete: deletePlugin,
+      toggle: togglePlugin,
     },
     loadStatuses,
   );
@@ -61,7 +68,7 @@ function PluginsTab() {
 
   const handleRestart = async (id: string) => {
     try {
-      await invoke("restart_plugin", { id });
+      await restartPlugin(id);
       await loadStatuses();
     } catch (e) {
       console.error("Failed to restart plugin:", e);
@@ -135,7 +142,7 @@ function PluginsTab() {
       {showForm && (
         <PluginForm
           plugin={editingPlugin}
-          onSave={(plugin) => handleSave("plugin", plugin)}
+          onSave={(plugin) => handleSave(plugin)}
           onCancel={closeForm}
         />
       )}

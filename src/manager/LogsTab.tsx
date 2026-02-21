@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ExecutionLog } from "../types";
 import { formatSource, formatDuration, statusBadgeClass } from "../utils";
+import { getLogs, clearLogs } from "../commands";
 import LogDetail from "./LogDetail";
 
 function LogsTab() {
@@ -13,7 +13,7 @@ function LogsTab() {
 
   const loadLogs = async () => {
     try {
-      const data = await invoke<ExecutionLog[]>("get_logs", { limit, offset });
+      const data = await getLogs(limit, offset);
       setLogs(data);
     } catch (e) {
       console.error("Failed to load logs:", e);
@@ -32,7 +32,7 @@ function LogsTab() {
 
   const handleClear = async () => {
     try {
-      await invoke("clear_logs");
+      await clearLogs();
       setLogs([]);
       setSelectedLog(null);
     } catch (e) {

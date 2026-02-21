@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
 
-interface CrudCommands {
-  get: string;
-  save: string;
-  delete: string;
-  toggle: string;
+export interface CrudOperations<T> {
+  getAll: () => Promise<T[]>;
+  save: (item: T) => Promise<unknown>;
+  delete: (id: string) => Promise<unknown>;
+  toggle: (id: string, enabled: boolean) => Promise<unknown>;
 }
 
 interface UseCrudTabResult<T> {
@@ -13,7 +12,7 @@ interface UseCrudTabResult<T> {
   showForm: boolean;
   editingItem: T | null;
   loadItems: () => Promise<void>;
-  handleSave: (paramName: string, item: T) => Promise<void>;
+  handleSave: (item: T) => Promise<void>;
   handleDelete: (id: string) => Promise<void>;
   handleToggle: (id: string, enabled: boolean) => Promise<void>;
   handleEdit: (item: T) => void;
@@ -22,7 +21,7 @@ interface UseCrudTabResult<T> {
 }
 
 export function useCrudTab<T>(
-  commands: CrudCommands,
+  operations: CrudOperations<T>,
   afterMutate?: () => Promise<void>,
 ): UseCrudTabResult<T> {
   const [items, setItems] = useState<T[]>([]);
@@ -31,44 +30,44 @@ export function useCrudTab<T>(
 
   const loadItems = useCallback(async () => {
     try {
-      const data = await invoke<T[]>(commands.get);
+      const data = await operations.getAll();
       setItems(data);
     } catch (e) {
-      console.error(`Failed to load (${commands.get}):`, e);
+      console.error("Failed to load items:", e);
     }
-  }, [commands.get]);
+  }, [operations.getAll]);
 
   useEffect(() => {
     loadItems();
   }, [loadItems]);
 
-  const handleSave = async (paramName: string, item: T) => {
+  const handleSave = async (item: T) => {
     try {
-      await invoke(commands.save, { [paramName]: item });
+      await operations.save(item);
       setShowForm(false);
       setEditingItem(null);
       await loadItems();
       if (afterMutate) await afterMutate();
     } catch (e) {
-      console.error(`Failed to save (${commands.save}):`, e);
+      console.error("Failed to save item:", e);
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
-      await invoke(commands.delete, { id });
+      await operations.delete(id);
       await loadItems();
       if (afterMutate) await afterMutate();
     } catch (e) {
-      console.error(`Failed to delete (${commands.delete}):`, e);
+      console.error("Failed to delete item:", e);
     }
   };
 
   const handleToggle = async (id: string, enabled: boolean) => {
     try {
-      await invoke(commands.toggle, { id, enabled });
+      await operations.toggle(id, enabled);
     } catch (e) {
-      console.error(`Failed to toggle (${commands.toggle}):`, e);
+      console.error("Failed to toggle item:", e);
     } finally {
       await loadItems();
       if (afterMutate) await afterMutate();

@@ -1,52 +1,58 @@
 import { vi, afterEach, beforeEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import type { AppConfig } from "../types";
+import type { AppConfig, TerminalInfo } from "../types";
 
-export const defaultInvokeHandlers: Record<string, unknown> = {
-  get_config: {
-    shortcut: "Ctrl+Shift+Space",
-    terminal: "Auto",
-    wslShell: "Bash",
-    lastDirectory: null,
-    recentDirectories: [],
-    wslDirectory: null,
-    wslRecentDirectories: [],
-    schedules: [],
-    plugins: [],
-    subscriptions: [],
-  } as AppConfig,
-  get_available_terminals: [
-    { terminal_type: "Pwsh", display_name: "PowerShell 7", available: true },
-    { terminal_type: "PowerShell", display_name: "Windows PowerShell", available: true },
-    { terminal_type: "Cmd", display_name: "Command Prompt", available: true },
-    { terminal_type: "Wsl", display_name: "WSL", available: false },
-  ],
-  save_config: null,
-  hide_window: null,
-  open_claude_interactive: null,
-  update_recent_directory: null,
-  update_wsl_directory: null,
-  get_wsl_root_path: "\\\\wsl.localhost\\Ubuntu",
-  unc_to_wsl_path: "/home/user",
-  get_schedules: [],
-  get_plugins: [],
-  get_subscriptions: [],
-  get_logs: [],
-  get_plugin_statuses: [],
+const defaultConfig: AppConfig = {
+  shortcut: "Ctrl+Shift+Space",
+  terminal: "Auto",
+  wslShell: "Bash",
+  lastDirectory: null,
+  recentDirectories: [],
+  wslDirectory: null,
+  wslRecentDirectories: [],
+  schedules: [],
+  plugins: [],
+  subscriptions: [],
 };
 
-let invokeRef: ReturnType<typeof vi.fn>;
+const defaultTerminals: TerminalInfo[] = [
+  { terminal_type: "Pwsh", display_name: "PowerShell 7", available: true },
+  { terminal_type: "PowerShell", display_name: "Windows PowerShell", available: true },
+  { terminal_type: "Cmd", display_name: "Command Prompt", available: true },
+  { terminal_type: "Wsl", display_name: "WSL", available: false },
+];
 
-vi.mock("@tauri-apps/api/core", () => {
-  invokeRef = vi.fn((cmd: string, _args?: unknown) => {
-    return Promise.resolve(defaultInvokeHandlers[cmd] ?? null);
-  });
-  return {
-    invoke: invokeRef,
-    transformCallback: vi.fn(),
-  };
-});
+export const commandMocks = {
+  getConfig: vi.fn(() => Promise.resolve(defaultConfig)),
+  saveConfig: vi.fn(() => Promise.resolve()),
+  getAvailableTerminals: vi.fn(() => Promise.resolve(defaultTerminals)),
+  updateRecentDirectory: vi.fn(() => Promise.resolve()),
+  updateWslDirectory: vi.fn(() => Promise.resolve()),
+  getWslRootPath: vi.fn(() => Promise.resolve("\\\\wsl.localhost\\Ubuntu")),
+  uncToWslPath: vi.fn(() => Promise.resolve("/home/user")),
+  hideWindow: vi.fn(() => Promise.resolve()),
+  openClaudeInteractive: vi.fn(() => Promise.resolve()),
+  getLogs: vi.fn(() => Promise.resolve([])),
+  clearLogs: vi.fn(() => Promise.resolve()),
+  getSchedules: vi.fn(() => Promise.resolve([])),
+  saveSchedule: vi.fn(() => Promise.resolve()),
+  deleteSchedule: vi.fn(() => Promise.resolve()),
+  toggleSchedule: vi.fn(() => Promise.resolve()),
+  testRunSchedule: vi.fn(() => Promise.resolve("")),
+  getPlugins: vi.fn(() => Promise.resolve([])),
+  savePlugin: vi.fn(() => Promise.resolve()),
+  deletePlugin: vi.fn(() => Promise.resolve()),
+  togglePlugin: vi.fn(() => Promise.resolve()),
+  getPluginStatuses: vi.fn(() => Promise.resolve([])),
+  restartPlugin: vi.fn(() => Promise.resolve()),
+  getSubscriptions: vi.fn(() => Promise.resolve([])),
+  saveSubscription: vi.fn(() => Promise.resolve()),
+  deleteSubscription: vi.fn(() => Promise.resolve()),
+  toggleSubscription: vi.fn(() => Promise.resolve()),
+};
+
+vi.mock("../commands", () => commandMocks);
 
 const mockWindow = {
   onFocusChanged: vi.fn(() => Promise.resolve(() => {})),
@@ -79,8 +85,19 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  invokeRef.mockReset();
-  invokeRef.mockImplementation((cmd: string, _args?: unknown) => {
-    return Promise.resolve(defaultInvokeHandlers[cmd] ?? null);
-  });
+  for (const mock of Object.values(commandMocks)) {
+    mock.mockClear();
+  }
+  commandMocks.getConfig.mockImplementation(() => Promise.resolve(defaultConfig));
+  commandMocks.getAvailableTerminals.mockImplementation(() => Promise.resolve(defaultTerminals));
+  commandMocks.getWslRootPath.mockImplementation(() =>
+    Promise.resolve("\\\\wsl.localhost\\Ubuntu"),
+  );
+  commandMocks.uncToWslPath.mockImplementation(() => Promise.resolve("/home/user"));
+  commandMocks.getLogs.mockImplementation(() => Promise.resolve([]));
+  commandMocks.getSchedules.mockImplementation(() => Promise.resolve([]));
+  commandMocks.getPlugins.mockImplementation(() => Promise.resolve([]));
+  commandMocks.getSubscriptions.mockImplementation(() => Promise.resolve([]));
+  commandMocks.getPluginStatuses.mockImplementation(() => Promise.resolve([]));
+  commandMocks.testRunSchedule.mockImplementation(() => Promise.resolve(""));
 });

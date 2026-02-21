@@ -1,5 +1,11 @@
 import type { SubscriptionConfig } from "../types";
 import { useCrudTab } from "../hooks/useCrudTab";
+import {
+  getSubscriptions,
+  saveSubscription,
+  deleteSubscription,
+  toggleSubscription,
+} from "../commands";
 import SubscriptionForm from "./SubscriptionForm";
 
 function SubscriptionsTab() {
@@ -14,10 +20,10 @@ function SubscriptionsTab() {
     handleNew,
     closeForm,
   } = useCrudTab<SubscriptionConfig>({
-    get: "get_subscriptions",
-    save: "save_subscription",
-    delete: "delete_subscription",
-    toggle: "toggle_subscription",
+    getAll: getSubscriptions,
+    save: saveSubscription,
+    delete: deleteSubscription,
+    toggle: toggleSubscription,
   });
 
   return (
@@ -80,7 +86,7 @@ function SubscriptionsTab() {
       {showForm && (
         <SubscriptionForm
           subscription={editingSub}
-          onSave={(subscription) => handleSave("subscription", subscription)}
+          onSave={(subscription) => handleSave(subscription)}
           onCancel={closeForm}
         />
       )}

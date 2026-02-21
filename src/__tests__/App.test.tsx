@@ -1,20 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { invoke } from "@tauri-apps/api/core";
 import App from "../App";
 import type { AppConfig } from "../types";
-
-const mockedInvoke = vi.mocked(invoke);
+import { commandMocks } from "./setup";
 
 // mock reset is handled in setup.ts
 
 describe("App", () => {
-  it("初期描画でget_configが呼ばれ、プロンプト入力とディレクトリボタンが表示される", async () => {
+  it("初期描画でgetConfigが呼ばれ、プロンプト入力とディレクトリボタンが表示される", async () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(mockedInvoke).toHaveBeenCalledWith("get_config");
+      expect(commandMocks.getConfig).toHaveBeenCalled();
     });
 
     expect(screen.getByPlaceholderText("Ask Claude...")).toBeInTheDocument();
@@ -22,23 +20,18 @@ describe("App", () => {
   });
 
   it("configのlastDirectoryが反映される", async () => {
-    mockedInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_config") {
-        return Promise.resolve({
-          shortcut: "Ctrl+Shift+Space",
-          terminal: "Auto",
-          wslShell: "Bash",
-          lastDirectory: "C:\\project",
-          recentDirectories: ["C:\\project"],
-          wslDirectory: null,
-          wslRecentDirectories: [],
-          schedules: [],
-          plugins: [],
-          subscriptions: [],
-        } as AppConfig);
-      }
-      return Promise.resolve(null);
-    });
+    commandMocks.getConfig.mockResolvedValue({
+      shortcut: "Ctrl+Shift+Space",
+      terminal: "Auto",
+      wslShell: "Bash",
+      lastDirectory: "C:\\project",
+      recentDirectories: ["C:\\project"],
+      wslDirectory: null,
+      wslRecentDirectories: [],
+      schedules: [],
+      plugins: [],
+      subscriptions: [],
+    } as AppConfig);
 
     render(<App />);
 
@@ -47,12 +40,12 @@ describe("App", () => {
     });
   });
 
-  it("プロンプト入力→Enterでopen_claude_interactiveとhide_windowが呼ばれる", async () => {
+  it("プロンプト入力→EnterでopenClaudeInteractiveとhideWindowが呼ばれる", async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await waitFor(() => {
-      expect(mockedInvoke).toHaveBeenCalledWith("get_config");
+      expect(commandMocks.getConfig).toHaveBeenCalled();
     });
 
     const input = screen.getByPlaceholderText("Ask Claude...");
@@ -60,11 +53,8 @@ describe("App", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(mockedInvoke).toHaveBeenCalledWith("open_claude_interactive", {
-        prompt: "hello world",
-        workingDir: null,
-      });
-      expect(mockedInvoke).toHaveBeenCalledWith("hide_window");
+      expect(commandMocks.openClaudeInteractive).toHaveBeenCalledWith("hello world", null);
+      expect(commandMocks.hideWindow).toHaveBeenCalled();
     });
   });
 
@@ -73,24 +63,24 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(mockedInvoke).toHaveBeenCalledWith("get_config");
+      expect(commandMocks.getConfig).toHaveBeenCalled();
     });
 
-    mockedInvoke.mockClear();
+    commandMocks.openClaudeInteractive.mockClear();
 
     const input = screen.getByPlaceholderText("Ask Claude...");
     await user.click(input);
     await user.keyboard("{Enter}");
 
-    expect(mockedInvoke).not.toHaveBeenCalledWith("open_claude_interactive", expect.anything());
+    expect(commandMocks.openClaudeInteractive).not.toHaveBeenCalled();
   });
 
-  it("Escapeキーでhide_windowが呼ばれる", async () => {
+  it("EscapeキーでhideWindowが呼ばれる", async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await waitFor(() => {
-      expect(mockedInvoke).toHaveBeenCalledWith("get_config");
+      expect(commandMocks.getConfig).toHaveBeenCalled();
     });
 
     const input = screen.getByPlaceholderText("Ask Claude...");
@@ -98,30 +88,25 @@ describe("App", () => {
     await user.keyboard("{Escape}");
 
     await waitFor(() => {
-      expect(mockedInvoke).toHaveBeenCalledWith("hide_window");
+      expect(commandMocks.hideWindow).toHaveBeenCalled();
     });
   });
 
   it("ディレクトリドロップダウンが開閉する", async () => {
     const user = userEvent.setup();
 
-    mockedInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_config") {
-        return Promise.resolve({
-          shortcut: "Ctrl+Shift+Space",
-          terminal: "Auto",
-          wslShell: "Bash",
-          lastDirectory: "C:\\project",
-          recentDirectories: ["C:\\project", "C:\\other"],
-          wslDirectory: null,
-          wslRecentDirectories: [],
-          schedules: [],
-          plugins: [],
-          subscriptions: [],
-        } as AppConfig);
-      }
-      return Promise.resolve(null);
-    });
+    commandMocks.getConfig.mockResolvedValue({
+      shortcut: "Ctrl+Shift+Space",
+      terminal: "Auto",
+      wslShell: "Bash",
+      lastDirectory: "C:\\project",
+      recentDirectories: ["C:\\project", "C:\\other"],
+      wslDirectory: null,
+      wslRecentDirectories: [],
+      schedules: [],
+      plugins: [],
+      subscriptions: [],
+    } as AppConfig);
 
     render(<App />);
 
@@ -143,23 +128,18 @@ describe("App", () => {
   it("recentDirectories選択でcurrentDirectoryが更新される", async () => {
     const user = userEvent.setup();
 
-    mockedInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_config") {
-        return Promise.resolve({
-          shortcut: "Ctrl+Shift+Space",
-          terminal: "Auto",
-          wslShell: "Bash",
-          lastDirectory: "C:\\project",
-          recentDirectories: ["C:\\project", "C:\\other"],
-          wslDirectory: null,
-          wslRecentDirectories: [],
-          schedules: [],
-          plugins: [],
-          subscriptions: [],
-        } as AppConfig);
-      }
-      return Promise.resolve(null);
-    });
+    commandMocks.getConfig.mockResolvedValue({
+      shortcut: "Ctrl+Shift+Space",
+      terminal: "Auto",
+      wslShell: "Bash",
+      lastDirectory: "C:\\project",
+      recentDirectories: ["C:\\project", "C:\\other"],
+      wslDirectory: null,
+      wslRecentDirectories: [],
+      schedules: [],
+      plugins: [],
+      subscriptions: [],
+    } as AppConfig);
 
     render(<App />);
 
