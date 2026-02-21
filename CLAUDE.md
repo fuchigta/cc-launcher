@@ -20,7 +20,7 @@ pnpm bump <version> # バージョン一括更新
 
 | 変更内容 | 更新が必要なファイル |
 |----------|---------------------|
-| バージョン更新 | package.json, Cargo.toml, tauri.conf.json（`pnpm bump`使用） |
+| バージョン更新 | package.json, Cargo.toml, tauri.conf.json（`pnpm bump`使用）。コミット後に `git tag v<version>` でタグを打ち、`git push origin v<version>` でプッシュする |
 | Tauriコマンド追加 | src-tauri/src/lib.rs + src/types.ts |
 
 ## コードスタイル
