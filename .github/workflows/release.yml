@@ -36,7 +36,14 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install frontend dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Create plugin binary stubs for test
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/plugins/bin
+          New-Item -ItemType File -Force -Path src-tauri/plugins/bin/folder-watcher.exe
+          New-Item -ItemType File -Force -Path src-tauri/plugins/bin/imap-watcher.exe
+        shell: pwsh
 
       - name: Run tests
         run: pnpm test:all
