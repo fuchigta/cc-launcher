@@ -1,10 +1,13 @@
+use crate::error::AppResult;
 use crate::models::{PluginConfig, ScheduleConfig, SubscriptionConfig};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct AppConfig {
     pub shortcut: String,
     pub terminal: TerminalType,
@@ -26,7 +29,8 @@ pub struct AppConfig {
     pub subscriptions: Vec<SubscriptionConfig>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ts_rs::TS)]
+#[ts(export)]
 pub enum TerminalType {
     Auto,
     Pwsh,
@@ -35,7 +39,8 @@ pub enum TerminalType {
     Wsl,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, ts_rs::TS)]
+#[ts(export)]
 pub enum WslShell {
     #[default]
     Bash,
@@ -71,22 +76,29 @@ impl AppConfig {
     pub fn load() -> Self {
         let path = Self::config_path();
         if path.exists() {
-            fs::read_to_string(&path)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default()
-        } else {
-            Self::default()
+            match fs::read_to_string(&path) {
+                Ok(content) => match serde_json::from_str(&content) {
+                    Ok(config) => return config,
+                    Err(e) => {
+                        eprintln!("Failed to parse config {}: {}", path.display(), e);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to read config {}: {}", path.display(), e);
+                }
+            }
         }
+        Self::default()
     }
 
-    pub fn save(&self) -> Result<(), String> {
+    pub fn save(&self) -> AppResult<()> {
         let path = Self::config_path();
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            fs::create_dir_all(parent)?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
-        fs::write(&path, json).map_err(|e| e.to_string())
+        let json = serde_json::to_string_pretty(self)?;
+        fs::write(&path, json)?;
+        Ok(())
     }
 }
 

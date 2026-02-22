@@ -1,4 +1,5 @@
 mod config;
+mod error;
 mod headless;
 mod logs;
 mod models;
@@ -11,6 +12,7 @@ mod windows_util;
 use std::sync::Arc;
 
 use config::AppConfig;
+use error::{AppError, AppResult};
 use models::{
     ExecutionLog, ExecutionSource, PluginConfig, PluginStatus, ScheduleConfig, SubscriptionConfig,
 };
@@ -40,7 +42,7 @@ async fn run_headless(
     prompt: String,
     working_dir: Option<String>,
     claude_args: Option<Vec<String>>,
-) -> Result<String, String> {
+) -> AppResult<String> {
     let args = claude_args.unwrap_or_default();
     let log = headless::execute(
         &prompt,
@@ -54,28 +56,25 @@ async fn run_headless(
 }
 
 #[tauri::command]
-async fn get_logs(
-    limit: Option<usize>,
-    offset: Option<usize>,
-) -> Result<Vec<ExecutionLog>, String> {
+async fn get_logs(limit: Option<usize>, offset: Option<usize>) -> AppResult<Vec<ExecutionLog>> {
     logs::list_logs(limit.unwrap_or(50), offset.unwrap_or(0))
 }
 
 #[tauri::command]
-async fn get_log(id: String) -> Result<ExecutionLog, String> {
+async fn get_log(id: String) -> AppResult<ExecutionLog> {
     logs::get_log(&id)
 }
 
 #[tauri::command]
-async fn clear_logs() -> Result<(), String> {
+async fn clear_logs() -> AppResult<()> {
     logs::clear_logs()
 }
 
 // --- Config helpers ---
 
-fn with_config<F>(updater: F) -> Result<AppConfig, String>
+fn with_config<F>(updater: F) -> AppResult<AppConfig>
 where
-    F: FnOnce(&mut AppConfig) -> Result<(), String>,
+    F: FnOnce(&mut AppConfig) -> AppResult<()>,
 {
     let mut config = AppConfig::load();
     updater(&mut config)?;
@@ -83,11 +82,14 @@ where
     Ok(config)
 }
 
-async fn reload_scheduler(app: &tauri::AppHandle, config: &AppConfig) -> Result<(), String> {
+async fn reload_scheduler(app: &tauri::AppHandle, config: &AppConfig) -> AppResult<()> {
     let state = app.state::<AppState>();
     let guard = state.scheduler.read().await;
     if let Some(sched) = guard.as_ref() {
-        sched.reload_all(&config.schedules).await?;
+        sched
+            .reload_all(&config.schedules)
+            .await
+            .map_err(AppError::Execution)?;
     }
     Ok(())
 }
@@ -108,10 +110,7 @@ fn get_schedules() -> Vec<ScheduleConfig> {
 }
 
 #[tauri::command]
-async fn save_schedule(
-    app_handle: tauri::AppHandle,
-    schedule: ScheduleConfig,
-) -> Result<(), String> {
+async fn save_schedule(app_handle: tauri::AppHandle, schedule: ScheduleConfig) -> AppResult<()> {
     let config = with_config(|c| {
         if let Some(existing) = c.schedules.iter_mut().find(|s| s.id == schedule.id) {
             *existing = schedule.clone();
@@ -124,7 +123,7 @@ async fn save_schedule(
 }
 
 #[tauri::command]
-async fn delete_schedule(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
+async fn delete_schedule(app_handle: tauri::AppHandle, id: String) -> AppResult<()> {
     let config = with_config(|c| {
         c.schedules.retain(|s| s.id != id);
         Ok(())
@@ -133,30 +132,26 @@ async fn delete_schedule(app_handle: tauri::AppHandle, id: String) -> Result<(),
 }
 
 #[tauri::command]
-async fn toggle_schedule(
-    app_handle: tauri::AppHandle,
-    id: String,
-    enabled: bool,
-) -> Result<(), String> {
+async fn toggle_schedule(app_handle: tauri::AppHandle, id: String, enabled: bool) -> AppResult<()> {
     let config = with_config(|c| {
         if let Some(schedule) = c.schedules.iter_mut().find(|s| s.id == id) {
             schedule.enabled = enabled;
             Ok(())
         } else {
-            Err("Schedule not found".to_string())
+            Err(AppError::NotFound("Schedule not found".to_string()))
         }
     })?;
     reload_scheduler(&app_handle, &config).await
 }
 
 #[tauri::command]
-async fn test_run_schedule(app_handle: tauri::AppHandle, id: String) -> Result<String, String> {
+async fn test_run_schedule(app_handle: tauri::AppHandle, id: String) -> AppResult<String> {
     let config = AppConfig::load();
     let schedule = config
         .schedules
         .iter()
         .find(|s| s.id == id)
-        .ok_or_else(|| "Schedule not found".to_string())?;
+        .ok_or_else(|| AppError::NotFound("Schedule not found".to_string()))?;
 
     let log = headless::execute(
         &schedule.prompt,
@@ -180,7 +175,7 @@ fn get_plugins() -> Vec<PluginConfig> {
 }
 
 #[tauri::command]
-async fn save_plugin(app_handle: tauri::AppHandle, plugin: PluginConfig) -> Result<(), String> {
+async fn save_plugin(app_handle: tauri::AppHandle, plugin: PluginConfig) -> AppResult<()> {
     let config = with_config(|c| {
         if let Some(existing) = c.plugins.iter_mut().find(|p| p.id == plugin.id) {
             *existing = plugin.clone();
@@ -190,7 +185,6 @@ async fn save_plugin(app_handle: tauri::AppHandle, plugin: PluginConfig) -> Resu
         Ok(())
     })?;
 
-    // Restart all plugins
     let state = app_handle.state::<AppState>();
     let guard = state.plugin_manager.read().await;
     if let Some(pm) = guard.as_ref() {
@@ -201,7 +195,7 @@ async fn save_plugin(app_handle: tauri::AppHandle, plugin: PluginConfig) -> Resu
 }
 
 #[tauri::command]
-async fn delete_plugin(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
+async fn delete_plugin(app_handle: tauri::AppHandle, id: String) -> AppResult<()> {
     let state = app_handle.state::<AppState>();
     let guard = state.plugin_manager.read().await;
     if let Some(pm) = guard.as_ref() {
@@ -217,17 +211,13 @@ async fn delete_plugin(app_handle: tauri::AppHandle, id: String) -> Result<(), S
 }
 
 #[tauri::command]
-async fn toggle_plugin(
-    app_handle: tauri::AppHandle,
-    id: String,
-    enabled: bool,
-) -> Result<(), String> {
+async fn toggle_plugin(app_handle: tauri::AppHandle, id: String, enabled: bool) -> AppResult<()> {
     let config = with_config(|c| {
         if let Some(plugin) = c.plugins.iter_mut().find(|p| p.id == id) {
             plugin.enabled = enabled;
             Ok(())
         } else {
-            Err("Plugin not found".to_string())
+            Err(AppError::NotFound("Plugin not found".to_string()))
         }
     })?;
 
@@ -235,19 +225,23 @@ async fn toggle_plugin(
     let guard = state.plugin_manager.read().await;
     if let Some(pm) = guard.as_ref() {
         if enabled {
-            let plugin = config.plugins.iter().find(|p| p.id == id).unwrap();
+            let plugin = config
+                .plugins
+                .iter()
+                .find(|p| p.id == id)
+                .ok_or_else(|| AppError::NotFound(format!("Plugin not found: {}", id)))?;
             if let Err(e) = pm.start_plugin(plugin).await {
                 eprintln!("Failed to start plugin {}: {}", id, e);
             }
         } else {
-            pm.stop_plugin(&id).await?;
+            pm.stop_plugin(&id).await.map_err(AppError::Plugin)?;
         }
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn get_plugin_statuses(app_handle: tauri::AppHandle) -> Result<Vec<PluginStatus>, String> {
+async fn get_plugin_statuses(app_handle: tauri::AppHandle) -> AppResult<Vec<PluginStatus>> {
     let state = app_handle.state::<AppState>();
     let guard = state.plugin_manager.read().await;
     match guard.as_ref() {
@@ -257,20 +251,20 @@ async fn get_plugin_statuses(app_handle: tauri::AppHandle) -> Result<Vec<PluginS
 }
 
 #[tauri::command]
-async fn restart_plugin(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
+async fn restart_plugin(app_handle: tauri::AppHandle, id: String) -> AppResult<()> {
     let config = AppConfig::load();
     let plugin = config
         .plugins
         .iter()
         .find(|p| p.id == id)
-        .ok_or_else(|| "Plugin not found".to_string())?
+        .ok_or_else(|| AppError::NotFound("Plugin not found".to_string()))?
         .clone();
 
     let state = app_handle.state::<AppState>();
     let guard = state.plugin_manager.read().await;
     if let Some(pm) = guard.as_ref() {
         pm.stop_plugin(&id).await.ok();
-        pm.start_plugin(&plugin).await?;
+        pm.start_plugin(&plugin).await.map_err(AppError::Plugin)?;
     }
     Ok(())
 }
@@ -286,7 +280,7 @@ fn get_subscriptions() -> Vec<SubscriptionConfig> {
 async fn save_subscription(
     app_handle: tauri::AppHandle,
     subscription: SubscriptionConfig,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let config = with_config(|c| {
         if let Some(existing) = c.subscriptions.iter_mut().find(|s| s.id == subscription.id) {
             *existing = subscription.clone();
@@ -300,7 +294,7 @@ async fn save_subscription(
 }
 
 #[tauri::command]
-async fn delete_subscription(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
+async fn delete_subscription(app_handle: tauri::AppHandle, id: String) -> AppResult<()> {
     let config = with_config(|c| {
         c.subscriptions.retain(|s| s.id != id);
         Ok(())
@@ -314,13 +308,13 @@ async fn toggle_subscription(
     app_handle: tauri::AppHandle,
     id: String,
     enabled: bool,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let config = with_config(|c| {
         if let Some(sub) = c.subscriptions.iter_mut().find(|s| s.id == id) {
             sub.enabled = enabled;
             Ok(())
         } else {
-            Err("Subscription not found".to_string())
+            Err(AppError::NotFound("Subscription not found".to_string()))
         }
     })?;
     reload_subscriptions(&app_handle, &config).await;
@@ -330,12 +324,12 @@ async fn toggle_subscription(
 // --- Config commands ---
 
 #[tauri::command]
-fn get_config() -> AppConfig {
-    AppConfig::load()
+fn get_config() -> AppResult<AppConfig> {
+    Ok(AppConfig::load())
 }
 
 #[tauri::command]
-fn save_config(new_config: AppConfig) -> Result<(), String> {
+fn save_config(new_config: AppConfig) -> AppResult<()> {
     new_config.save()
 }
 
@@ -345,10 +339,7 @@ fn get_available_terminals() -> Vec<TerminalInfo> {
 }
 
 #[tauri::command]
-async fn open_claude_interactive(
-    prompt: String,
-    working_dir: Option<String>,
-) -> Result<(), String> {
+async fn open_claude_interactive(prompt: String, working_dir: Option<String>) -> AppResult<()> {
     let config = AppConfig::load();
     let resolved_terminal = terminal::TerminalDetector::resolve(&config.terminal);
     terminal::launch_claude(
@@ -358,6 +349,7 @@ async fn open_claude_interactive(
         &config.wsl_shell,
         config.wsl_directory.as_deref(),
     )
+    .map_err(AppError::Execution)
 }
 
 fn update_directory_list(list: &mut Vec<String>, last: &mut Option<String>, directory: String) {
@@ -368,7 +360,7 @@ fn update_directory_list(list: &mut Vec<String>, last: &mut Option<String>, dire
 }
 
 #[tauri::command]
-async fn update_recent_directory(directory: String) -> Result<(), String> {
+async fn update_recent_directory(directory: String) -> AppResult<()> {
     with_config(|c| {
         update_directory_list(&mut c.recent_directories, &mut c.last_directory, directory);
         Ok(())
@@ -377,7 +369,7 @@ async fn update_recent_directory(directory: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn update_wsl_directory(directory: String) -> Result<(), String> {
+async fn update_wsl_directory(directory: String) -> AppResult<()> {
     with_config(|c| {
         update_directory_list(
             &mut c.wsl_recent_directories,
@@ -390,20 +382,23 @@ async fn update_wsl_directory(directory: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn hide_window(window: tauri::Window) -> Result<(), String> {
-    window.hide().map_err(|e| e.to_string())
+async fn hide_window(window: tauri::Window) -> AppResult<()> {
+    window
+        .hide()
+        .map_err(|e| AppError::Execution(e.to_string()))
 }
 
 #[tauri::command]
-fn get_wsl_root_path() -> Result<String, String> {
-    // Get the default WSL distribution name
+fn get_wsl_root_path() -> AppResult<String> {
     let output = windows_util::no_window_command("wsl")
         .args(["-l", "-q"])
         .output()
-        .map_err(|e| format!("Failed to run wsl command: {}", e))?;
+        .map_err(|e| AppError::Execution(format!("Failed to run wsl command: {}", e)))?;
 
     if !output.status.success() {
-        return Err("Failed to get WSL distributions".to_string());
+        return Err(AppError::Execution(
+            "Failed to get WSL distributions".to_string(),
+        ));
     }
 
     let decoded = decode_utf16le(&output.stdout);
@@ -411,14 +406,13 @@ fn get_wsl_root_path() -> Result<String, String> {
         .lines()
         .map(|s| s.trim().trim_matches('\0'))
         .find(|s| !s.is_empty())
-        .ok_or_else(|| "No WSL distribution found".to_string())?;
+        .ok_or_else(|| AppError::NotFound("No WSL distribution found".to_string()))?;
 
     Ok(format!("\\\\wsl.localhost\\{}", distro))
 }
 
 #[tauri::command]
-fn unc_to_wsl_path(unc_path: String) -> Result<String, String> {
-    // Handle both \\wsl.localhost\Distro\... and \\wsl$\Distro\...
+fn unc_to_wsl_path(unc_path: String) -> AppResult<String> {
     let path = unc_path.replace('/', "\\");
 
     let stripped = if let Some(rest) = path.strip_prefix("\\\\wsl.localhost\\") {
@@ -426,15 +420,16 @@ fn unc_to_wsl_path(unc_path: String) -> Result<String, String> {
     } else if let Some(rest) = path.strip_prefix("\\\\wsl$\\") {
         rest
     } else {
-        return Err(format!("Not a valid WSL UNC path: {}", unc_path));
+        return Err(AppError::Execution(format!(
+            "Not a valid WSL UNC path: {}",
+            unc_path
+        )));
     };
 
-    // Find the first backslash after the distro name
     if let Some(pos) = stripped.find('\\') {
         let wsl_path = stripped[pos..].replace('\\', "/");
         Ok(wsl_path)
     } else {
-        // Just the distro name, return root
         Ok("/".to_string())
     }
 }

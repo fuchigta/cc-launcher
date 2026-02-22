@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 // --- Execution ---
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(tag = "type")]
 pub enum ExecutionSource {
     Schedule {
@@ -14,22 +15,27 @@ pub enum ExecutionSource {
     },
     Plugin {
         #[serde(rename = "pluginName")]
+        #[ts(rename = "pluginName")]
         plugin_name: String,
         #[serde(rename = "eventType")]
+        #[ts(rename = "eventType")]
         event_type: String,
     },
     Manual,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ts_rs::TS)]
+#[ts(export)]
 pub enum ExecutionStatus {
     Running,
     Success,
     Failed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct ExecutionLog {
     pub id: String,
     pub source: ExecutionSource,
@@ -47,7 +53,8 @@ pub struct ExecutionLog {
 
 // --- Schedule ---
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(tag = "type")]
 pub enum ScheduleExpression {
     Cron { expression: String },
@@ -55,8 +62,10 @@ pub enum ScheduleExpression {
     DailyAt { time: String },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct ScheduleConfig {
     pub id: String,
     pub name: String,
@@ -75,8 +84,10 @@ fn default_true() -> bool {
 
 // --- Plugin ---
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct PluginConfig {
     pub id: String,
     pub name: String,
@@ -87,8 +98,10 @@ pub struct PluginConfig {
     pub enabled: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct PluginStatus {
     pub id: String,
     pub name: String,
@@ -135,8 +148,10 @@ pub struct JsonRpcError {
     pub data: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct PluginEvent {
     pub event_type: String,
     #[serde(default)]
@@ -145,8 +160,10 @@ pub struct PluginEvent {
 
 // --- Subscription ---
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct SubscriptionConfig {
     pub id: String,
     pub name: String,

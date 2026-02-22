@@ -7,18 +7,21 @@ import {
   toggleSubscription,
 } from "../commands";
 import SubscriptionForm from "./SubscriptionForm";
+import CrudTabLayout from "./CrudTabLayout";
 
 function SubscriptionsTab() {
   const {
     items: subscriptions,
     showForm,
     editingItem: editingSub,
+    error,
     handleSave,
     handleDelete,
     handleToggle,
     handleEdit,
     handleNew,
     closeForm,
+    clearError,
   } = useCrudTab<SubscriptionConfig>({
     getAll: getSubscriptions,
     save: saveSubscription,
@@ -27,61 +30,41 @@ function SubscriptionsTab() {
   });
 
   return (
-    <div>
-      <div className="toolbar">
-        <span>{subscriptions.length} subscription(s)</span>
-        <div className="toolbar-actions">
-          <button className="btn btn-primary" onClick={handleNew}>
-            + New Subscription
-          </button>
-        </div>
-      </div>
-
-      {subscriptions.length === 0 ? (
-        <div className="empty-state">
-          <p>No subscriptions configured</p>
-          <button className="btn btn-primary" onClick={handleNew}>
-            Create your first subscription
-          </button>
-        </div>
-      ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Enabled</th>
-              <th>Name</th>
-              <th>Plugin</th>
-              <th>Event</th>
-              <th>Prompt</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subscriptions.map((s) => (
-              <tr key={s.id}>
-                <td>
-                  <button
-                    className={`toggle ${s.enabled ? "active" : ""}`}
-                    onClick={() => handleToggle(s.id, !s.enabled)}
-                  />
-                </td>
-                <td>{s.name}</td>
-                <td>{s.pluginName}</td>
-                <td>{s.eventType}</td>
-                <td className="truncated-cell">{s.promptTemplate}</td>
-                <td>
-                  <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(s)}>
-                    Edit
-                  </button>{" "}
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(s.id)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+    <>
+      <CrudTabLayout
+        error={error}
+        clearError={clearError}
+        itemCount={subscriptions.length}
+        itemLabel="subscription"
+        newButtonLabel="+ New Subscription"
+        emptyMessage="No subscriptions configured"
+        emptyButtonLabel="Create your first subscription"
+        onNew={handleNew}
+        headers={["Enabled", "Name", "Plugin", "Event", "Prompt", "Actions"]}
+      >
+        {subscriptions.map((s) => (
+          <tr key={s.id}>
+            <td>
+              <button
+                className={`toggle ${s.enabled ? "active" : ""}`}
+                onClick={() => handleToggle(s.id, !s.enabled)}
+              />
+            </td>
+            <td>{s.name}</td>
+            <td>{s.pluginName}</td>
+            <td>{s.eventType}</td>
+            <td className="truncated-cell">{s.promptTemplate}</td>
+            <td>
+              <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(s)}>
+                Edit
+              </button>{" "}
+              <button className="btn btn-sm btn-danger" onClick={() => handleDelete(s.id)}>
+                Delete
+              </button>
+            </td>
+          </tr>
+        ))}
+      </CrudTabLayout>
 
       {showForm && (
         <SubscriptionForm
@@ -90,7 +73,7 @@ function SubscriptionsTab() {
           onCancel={closeForm}
         />
       )}
-    </div>
+    </>
   );
 }
 

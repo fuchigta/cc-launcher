@@ -21,7 +21,8 @@ pnpm bump <version> # バージョン一括更新
 | 変更内容 | 更新が必要なファイル |
 |----------|---------------------|
 | バージョン更新 | package.json, Cargo.toml, tauri.conf.json（`pnpm bump`使用）。コミット後に `git tag v<version>` でタグを打ち、`git push origin v<version>` でプッシュする |
-| Tauriコマンド追加 | src-tauri/src/lib.rs + src/types.ts |
+| Tauriコマンド追加 | src-tauri/src/lib.rs のみ（型定義は自動生成） |
+| Rust型定義の変更 | `#[derive(ts_rs::TS)] #[ts(export)]`付き構造体を変更後、`pnpm ts:generate`で`src-tauri/bindings/`を更新し、必要に応じてsrc/types.tsから該当型をimportに置き換え |
 
 ## コードスタイル
 
@@ -32,7 +33,10 @@ pnpm bump <version> # バージョン一括更新
 
 **Rust (src-tauri/)**
 - TauriコマンドはResult<T, String>で返す
-- コマンド追加時はtypes.tsも更新
+- 型定義にts-rs deriveを追加することでTypeScript型を自動生成
+- フロント共有型には `#[derive(ts_rs::TS)] #[ts(export)]` を付与
+- `#[serde(rename_all = "camelCase")]` がある場合は `#[ts(rename_all = "camelCase")]` も追加
+- `#[serde(rename = "foo")]` がある場合は `#[ts(rename = "foo")]` も追加
 
 ## 自動チェック
 
@@ -49,6 +53,7 @@ pnpm bump <version> # バージョン一括更新
 pnpm test:all       # 全テスト一括（フロントエンド + Rust）
 pnpm test           # フロントエンドテストのみ (Vitest)
 pnpm hook:final     # 静的解析全チェック
+pnpm ts:generate    # Rust型からTypeScript型定義を生成
 ```
 
 **UI確認（playwright-cli）**
@@ -67,4 +72,5 @@ pnpm hook:final     # 静的解析全チェック
 | ウィンドウ定義 | `src-tauri/tauri.conf.json` |
 | Tauriコマンド | `src-tauri/src/lib.rs`（`generate_handler![]`） |
 | フロントエンドルート | `src/main.tsx` |
-| 共有型定義 | `src/types.ts` |
+| TypeScript型定義 | `src-tauri/bindings/`（自動生成） + `src/types.ts`（手動定義） |
+| Rust型定義 | `src-tauri/src/models.rs`, `src-tauri/src/config.rs` |

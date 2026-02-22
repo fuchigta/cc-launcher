@@ -1,3 +1,4 @@
+use crate::error::{AppError, AppResult};
 use crate::logs;
 use crate::models::{ExecutionLog, ExecutionSource, ExecutionStatus};
 use chrono::Utc;
@@ -10,7 +11,7 @@ pub async fn execute(
     claude_args: &[String],
     source: ExecutionSource,
     app_handle: &tauri::AppHandle,
-) -> Result<ExecutionLog, String> {
+) -> AppResult<ExecutionLog> {
     let id = Uuid::new_v4().to_string();
     let started_at = Utc::now();
 
@@ -30,10 +31,11 @@ pub async fn execute(
 
     let mut cmd = tokio::process::Command::from(std_cmd);
 
-    let output = cmd
-        .output()
+    let timeout_secs = std::time::Duration::from_secs(300);
+    let output = tokio::time::timeout(timeout_secs, cmd.output())
         .await
-        .map_err(|e| format!("Failed to execute claude: {}", e))?;
+        .map_err(|_| AppError::Execution("Claude execution timed out (300s)".to_string()))?
+        .map_err(|e| AppError::Execution(format!("Failed to execute claude: {}", e)))?;
 
     let completed_at = Utc::now();
     let duration_ms = (completed_at - started_at).num_milliseconds() as u64;

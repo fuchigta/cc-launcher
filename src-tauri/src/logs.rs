@@ -1,3 +1,4 @@
+use crate::error::{AppError, AppResult};
 use crate::models::ExecutionLog;
 use std::fs;
 use std::path::PathBuf;
@@ -9,22 +10,22 @@ fn logs_dir() -> PathBuf {
         .join("logs")
 }
 
-pub fn write_log(log: &ExecutionLog) -> Result<(), String> {
+pub fn write_log(log: &ExecutionLog) -> AppResult<()> {
     let dir = logs_dir();
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir)?;
     let path = dir.join(format!("{}.json", log.id));
-    let json = serde_json::to_string_pretty(log).map_err(|e| e.to_string())?;
-    fs::write(&path, json).map_err(|e| e.to_string())
+    let json = serde_json::to_string_pretty(log)?;
+    fs::write(&path, json)?;
+    Ok(())
 }
 
-pub fn list_logs(limit: usize, offset: usize) -> Result<Vec<ExecutionLog>, String> {
+pub fn list_logs(limit: usize, offset: usize) -> AppResult<Vec<ExecutionLog>> {
     let dir = logs_dir();
     if !dir.exists() {
         return Ok(Vec::new());
     }
 
-    let mut entries: Vec<_> = fs::read_dir(&dir)
-        .map_err(|e| e.to_string())?
+    let mut entries: Vec<_> = fs::read_dir(&dir)?
         .filter_map(|e| e.ok())
         .filter(|e| {
             e.path()
@@ -34,7 +35,6 @@ pub fn list_logs(limit: usize, offset: usize) -> Result<Vec<ExecutionLog>, Strin
         })
         .collect();
 
-    // Sort by modification time descending (newest first)
     entries.sort_by(|a, b| {
         let time_a = a.metadata().and_then(|m| m.modified()).ok();
         let time_b = b.metadata().and_then(|m| m.modified()).ok();
@@ -54,16 +54,28 @@ pub fn list_logs(limit: usize, offset: usize) -> Result<Vec<ExecutionLog>, Strin
     Ok(logs)
 }
 
-pub fn get_log(id: &str) -> Result<ExecutionLog, String> {
+pub fn get_log(id: &str) -> AppResult<ExecutionLog> {
     let path = logs_dir().join(format!("{}.json", id));
-    let content = fs::read_to_string(&path).map_err(|e| format!("Log not found: {}", e))?;
-    serde_json::from_str(&content).map_err(|e| format!("Failed to parse log: {}", e))
+    let content = fs::read_to_string(&path)
+        .map_err(|e| AppError::NotFound(format!("Log not found: {}", e)))?;
+    serde_json::from_str(&content).map_err(AppError::Json)
 }
 
-pub fn clear_logs() -> Result<(), String> {
+pub fn clear_logs() -> AppResult<()> {
     let dir = logs_dir();
     if dir.exists() {
-        fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+        fs::remove_dir_all(&dir)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_log_not_found() {
+        let result = get_log("nonexistent-id");
+        assert!(result.is_err());
+    }
 }

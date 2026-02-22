@@ -11,6 +11,7 @@ import {
   restartPlugin,
 } from "../commands";
 import PluginForm from "./PluginForm";
+import CrudTabLayout from "./CrudTabLayout";
 
 function PluginsTab() {
   const [statuses, setStatuses] = useState<PluginStatus[]>([]);
@@ -28,12 +29,14 @@ function PluginsTab() {
     items: plugins,
     showForm,
     editingItem: editingPlugin,
+    error,
     handleSave,
     handleDelete,
     handleToggle,
     handleEdit,
     handleNew,
     closeForm,
+    clearError,
   } = useCrudTab<PluginConfig>(
     {
       getAll: getPlugins,
@@ -76,68 +79,46 @@ function PluginsTab() {
   };
 
   return (
-    <div>
-      <div className="toolbar">
-        <span>{plugins.length} plugin(s)</span>
-        <div className="toolbar-actions">
-          <button className="btn btn-primary" onClick={handleNew}>
-            + New Plugin
-          </button>
-        </div>
-      </div>
-
-      {plugins.length === 0 ? (
-        <div className="empty-state">
-          <p>No plugins configured</p>
-          <button className="btn btn-primary" onClick={handleNew}>
-            Register your first plugin
-          </button>
-        </div>
-      ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Enabled</th>
-              <th>Name</th>
-              <th>Executable</th>
-              <th>Status</th>
-              <th>Actions</th>
+    <>
+      <CrudTabLayout
+        error={error}
+        clearError={clearError}
+        itemCount={plugins.length}
+        itemLabel="plugin"
+        newButtonLabel="+ New Plugin"
+        emptyMessage="No plugins configured"
+        emptyButtonLabel="Register your first plugin"
+        onNew={handleNew}
+        headers={["Enabled", "Name", "Executable", "Status", "Actions"]}
+      >
+        {plugins.map((p) => {
+          const status = getStatus(p.id);
+          return (
+            <tr key={p.id}>
+              <td>
+                <button
+                  className={`toggle ${p.enabled ? "active" : ""}`}
+                  onClick={() => handleToggle(p.id, !p.enabled)}
+                />
+              </td>
+              <td>{p.name}</td>
+              <td className="truncated-cell">{p.executable}</td>
+              <td>{renderStatusBadge(status)}</td>
+              <td>
+                <button className="btn btn-sm btn-secondary" onClick={() => handleRestart(p.id)}>
+                  Restart
+                </button>{" "}
+                <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(p)}>
+                  Edit
+                </button>{" "}
+                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(p.id)}>
+                  Delete
+                </button>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {plugins.map((p) => {
-              const status = getStatus(p.id);
-              return (
-                <tr key={p.id}>
-                  <td>
-                    <button
-                      className={`toggle ${p.enabled ? "active" : ""}`}
-                      onClick={() => handleToggle(p.id, !p.enabled)}
-                    />
-                  </td>
-                  <td>{p.name}</td>
-                  <td className="truncated-cell">{p.executable}</td>
-                  <td>{renderStatusBadge(status)}</td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => handleRestart(p.id)}
-                    >
-                      Restart
-                    </button>{" "}
-                    <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(p)}>
-                      Edit
-                    </button>{" "}
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(p.id)}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+          );
+        })}
+      </CrudTabLayout>
 
       {showForm && (
         <PluginForm
@@ -146,7 +127,7 @@ function PluginsTab() {
           onCancel={closeForm}
         />
       )}
-    </div>
+    </>
   );
 }
 

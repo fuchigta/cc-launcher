@@ -149,6 +149,22 @@ impl TerminalDetector {
     }
 }
 
+fn escape_cmd_meta(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() * 2);
+    for c in s.chars() {
+        match c {
+            '"' => result.push_str("\\\""),
+            '%' => result.push_str("%%"),
+            '&' | '|' | '<' | '>' | '^' | '(' | ')' => {
+                result.push('^');
+                result.push(c);
+            }
+            _ => result.push(c),
+        }
+    }
+    result
+}
+
 pub fn launch_claude(
     terminal: &TerminalType,
     prompt: &str,
@@ -213,7 +229,7 @@ pub fn launch_claude(
             ]);
         }
         TerminalType::Cmd => {
-            let escaped = prompt.replace("\"", "\\\"").replace("%", "%%");
+            let escaped = escape_cmd_meta(prompt);
             let claude_cmd = format!("claude \"{}\"", escaped);
             if let Some(dir) = working_dir {
                 args.extend(["-d".to_string(), dir.to_string()]);
@@ -230,4 +246,27 @@ pub fn launch_claude(
     cmd.args(&args);
     cmd.spawn().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escape_cmd_meta_basic() {
+        assert_eq!(escape_cmd_meta("hello world"), "hello world");
+    }
+
+    #[test]
+    fn escape_cmd_meta_quotes_and_percent() {
+        assert_eq!(escape_cmd_meta("say \"hi\" 100%"), "say \\\"hi\\\" 100%%");
+    }
+
+    #[test]
+    fn escape_cmd_meta_shell_operators() {
+        assert_eq!(escape_cmd_meta("a & b | c"), "a ^& b ^| c");
+        assert_eq!(escape_cmd_meta("a > b < c"), "a ^> b ^< c");
+        assert_eq!(escape_cmd_meta("a ^ b"), "a ^^ b");
+        assert_eq!(escape_cmd_meta("(a)"), "^(a^)");
+    }
 }

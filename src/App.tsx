@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { TerminalType } from "./types";
@@ -20,6 +20,7 @@ function App() {
   const [wslDirectory, setWslDirectory] = useState<string>("");
   const [wslRecentDirectories, setWslRecentDirectories] = useState<string[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -100,6 +101,7 @@ function App() {
     e.preventDefault();
     if (prompt.trim()) {
       try {
+        setError(null);
         if (isWsl) {
           if (wslDirectory.trim()) {
             await updateWslDirectory(wslDirectory.trim());
@@ -113,8 +115,9 @@ function App() {
         }
         setPrompt("");
         await hideWindow();
-      } catch (error) {
-        console.error("Failed to launch Claude:", error);
+      } catch (err) {
+        console.error("Failed to launch Claude:", err);
+        setError(String(err));
       }
     }
   };
@@ -160,19 +163,22 @@ function App() {
     }, 100);
   };
 
-  const handleDirectoryClick = () => {
-    setDropdownOpen(!dropdownOpen);
-  };
+  const handleDirectoryClick = useCallback(() => {
+    setDropdownOpen((prev) => !prev);
+  }, []);
 
-  const handleSelectDirectory = (dir: string) => {
-    if (isWsl) {
-      setWslDirectory(dir);
-    } else {
-      setCurrentDirectory(dir);
-    }
-    setDropdownOpen(false);
-    inputRef.current?.focus();
-  };
+  const handleSelectDirectory = useCallback(
+    (dir: string) => {
+      if (isWsl) {
+        setWslDirectory(dir);
+      } else {
+        setCurrentDirectory(dir);
+      }
+      setDropdownOpen(false);
+      inputRef.current?.focus();
+    },
+    [isWsl],
+  );
 
   const handleBrowse = async (forWsl: boolean) => {
     isDialogOpenRef.current = true;
@@ -209,8 +215,9 @@ function App() {
           await updateRecentDirectory(selected);
         }
       }
-    } catch (error) {
-      console.error("Failed to browse directory:", error);
+    } catch (err) {
+      console.error("Failed to browse directory:", err);
+      setError(String(err));
     } finally {
       await currentWindow.setAlwaysOnTop(true);
       isDialogOpenRef.current = false;
@@ -259,6 +266,7 @@ function App() {
           className="prompt-input"
           autoFocus
         />
+        {error && <div className="error-message">{error}</div>}
         <div className="directory-row" ref={dropdownRef}>
           {isWsl ? (
             <>

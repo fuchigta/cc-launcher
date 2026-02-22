@@ -371,3 +371,10 @@
 .cancel-button:active {
   transform: scale(0.98);
 }
+
+/* Error message */
+.error-message {
+  color: #f5a5a5;
+  font-size: 12px;
+  padding: 4px 8px;
+}

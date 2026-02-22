@@ -110,4 +110,25 @@ mod tests {
         let result = expand_template("Hello {{name}}", &data);
         assert_eq!(result, "Hello {{name}}");
     }
+
+    #[test]
+    fn expand_template_empty_template() {
+        let data = serde_json::json!({"name": "test"});
+        let result = expand_template("", &data);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn expand_template_empty_data() {
+        let data = serde_json::json!({});
+        let result = expand_template("Hello {{name}}!", &data);
+        assert_eq!(result, "Hello {{name}}!");
+    }
+
+    #[test]
+    fn expand_template_nested_object() {
+        let data = serde_json::json!({"user": {"id": 1, "name": "test"}});
+        let result = expand_template("User: {{user}}", &data);
+        assert_eq!(result, r#"User: {"id":1,"name":"test"}"#);
+    }
 }

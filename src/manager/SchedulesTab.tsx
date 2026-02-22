@@ -8,6 +8,7 @@ import {
   testRunSchedule,
 } from "../commands";
 import ScheduleForm from "./ScheduleForm";
+import CrudTabLayout from "./CrudTabLayout";
 
 function formatExpression(schedule: ScheduleConfig): string {
   const expr = schedule.expression;
@@ -26,12 +27,14 @@ function SchedulesTab() {
     items: schedules,
     showForm,
     editingItem: editingSchedule,
+    error,
     handleSave,
     handleDelete,
     handleToggle,
     handleEdit,
     handleNew,
     closeForm,
+    clearError,
   } = useCrudTab<ScheduleConfig>({
     getAll: getSchedules,
     save: saveSchedule,
@@ -48,62 +51,43 @@ function SchedulesTab() {
   };
 
   return (
-    <div>
-      <div className="toolbar">
-        <span>{schedules.length} schedule(s)</span>
-        <div className="toolbar-actions">
-          <button className="btn btn-primary" onClick={handleNew}>
-            + New Schedule
-          </button>
-        </div>
-      </div>
-
-      {schedules.length === 0 ? (
-        <div className="empty-state">
-          <p>No schedules configured</p>
-          <button className="btn btn-primary" onClick={handleNew}>
-            Create your first schedule
-          </button>
-        </div>
-      ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Enabled</th>
-              <th>Name</th>
-              <th>Schedule</th>
-              <th>Prompt</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {schedules.map((s) => (
-              <tr key={s.id}>
-                <td>
-                  <button
-                    className={`toggle ${s.enabled ? "active" : ""}`}
-                    onClick={() => handleToggle(s.id, !s.enabled)}
-                  />
-                </td>
-                <td>{s.name}</td>
-                <td>{formatExpression(s)}</td>
-                <td className="truncated-cell">{s.prompt}</td>
-                <td>
-                  <button className="btn btn-sm btn-secondary" onClick={() => handleTestRun(s.id)}>
-                    Run
-                  </button>{" "}
-                  <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(s)}>
-                    Edit
-                  </button>{" "}
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(s.id)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+    <>
+      <CrudTabLayout
+        error={error}
+        clearError={clearError}
+        itemCount={schedules.length}
+        itemLabel="schedule"
+        newButtonLabel="+ New Schedule"
+        emptyMessage="No schedules configured"
+        emptyButtonLabel="Create your first schedule"
+        onNew={handleNew}
+        headers={["Enabled", "Name", "Schedule", "Prompt", "Actions"]}
+      >
+        {schedules.map((s) => (
+          <tr key={s.id}>
+            <td>
+              <button
+                className={`toggle ${s.enabled ? "active" : ""}`}
+                onClick={() => handleToggle(s.id, !s.enabled)}
+              />
+            </td>
+            <td>{s.name}</td>
+            <td>{formatExpression(s)}</td>
+            <td className="truncated-cell">{s.prompt}</td>
+            <td>
+              <button className="btn btn-sm btn-secondary" onClick={() => handleTestRun(s.id)}>
+                Run
+              </button>{" "}
+              <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(s)}>
+                Edit
+              </button>{" "}
+              <button className="btn btn-sm btn-danger" onClick={() => handleDelete(s.id)}>
+                Delete
+              </button>
+            </td>
+          </tr>
+        ))}
+      </CrudTabLayout>
 
       {showForm && (
         <ScheduleForm
@@ -112,7 +96,7 @@ function SchedulesTab() {
           onCancel={closeForm}
         />
       )}
-    </div>
+    </>
   );
 }
 

@@ -1,7 +1,15 @@
 import { vi, afterEach, beforeEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import type { AppConfig, TerminalInfo } from "../types";
+import type {
+  AppConfig,
+  ExecutionLog,
+  PluginConfig,
+  PluginStatus,
+  ScheduleConfig,
+  SubscriptionConfig,
+  TerminalInfo,
+} from "../types";
 
 const defaultConfig: AppConfig = {
   shortcut: "Ctrl+Shift+Space",
@@ -33,20 +41,20 @@ export const commandMocks = {
   uncToWslPath: vi.fn(() => Promise.resolve("/home/user")),
   hideWindow: vi.fn(() => Promise.resolve()),
   openClaudeInteractive: vi.fn(() => Promise.resolve()),
-  getLogs: vi.fn(() => Promise.resolve([])),
+  getLogs: vi.fn((): Promise<ExecutionLog[]> => Promise.resolve([])),
   clearLogs: vi.fn(() => Promise.resolve()),
-  getSchedules: vi.fn(() => Promise.resolve([])),
+  getSchedules: vi.fn((): Promise<ScheduleConfig[]> => Promise.resolve([])),
   saveSchedule: vi.fn(() => Promise.resolve()),
   deleteSchedule: vi.fn(() => Promise.resolve()),
   toggleSchedule: vi.fn(() => Promise.resolve()),
   testRunSchedule: vi.fn(() => Promise.resolve("")),
-  getPlugins: vi.fn(() => Promise.resolve([])),
+  getPlugins: vi.fn((): Promise<PluginConfig[]> => Promise.resolve([])),
   savePlugin: vi.fn(() => Promise.resolve()),
   deletePlugin: vi.fn(() => Promise.resolve()),
   togglePlugin: vi.fn(() => Promise.resolve()),
-  getPluginStatuses: vi.fn(() => Promise.resolve([])),
+  getPluginStatuses: vi.fn((): Promise<PluginStatus[]> => Promise.resolve([])),
   restartPlugin: vi.fn(() => Promise.resolve()),
-  getSubscriptions: vi.fn(() => Promise.resolve([])),
+  getSubscriptions: vi.fn((): Promise<SubscriptionConfig[]> => Promise.resolve([])),
   saveSubscription: vi.fn(() => Promise.resolve()),
   deleteSubscription: vi.fn(() => Promise.resolve()),
   toggleSubscription: vi.fn(() => Promise.resolve()),
