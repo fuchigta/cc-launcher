@@ -27,6 +27,12 @@ pub struct AppConfig {
     pub plugins: Vec<PluginConfig>,
     #[serde(default)]
     pub subscriptions: Vec<SubscriptionConfig>,
+    #[serde(default = "default_timeout_secs")]
+    pub timeout_secs: u64,
+}
+
+fn default_timeout_secs() -> u64 {
+    3600
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ts_rs::TS)]
@@ -61,6 +67,7 @@ impl Default for AppConfig {
             schedules: Vec::new(),
             plugins: Vec::new(),
             subscriptions: Vec::new(),
+            timeout_secs: 3600,
         }
     }
 }
@@ -132,6 +139,7 @@ mod tests {
             schedules: Vec::new(),
             plugins: Vec::new(),
             subscriptions: Vec::new(),
+            timeout_secs: 3600,
         };
 
         let json = serde_json::to_string(&config).unwrap();

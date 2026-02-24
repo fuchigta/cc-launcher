@@ -31,6 +31,7 @@ describe("App", () => {
       schedules: [],
       plugins: [],
       subscriptions: [],
+      timeoutSecs: 3600,
     } as AppConfig);
 
     render(<App />);
@@ -106,6 +107,7 @@ describe("App", () => {
       schedules: [],
       plugins: [],
       subscriptions: [],
+      timeoutSecs: 3600,
     } as AppConfig);
 
     render(<App />);
@@ -139,6 +141,7 @@ describe("App", () => {
       schedules: [],
       plugins: [],
       subscriptions: [],
+      timeoutSecs: 3600,
     } as AppConfig);
 
     render(<App />);

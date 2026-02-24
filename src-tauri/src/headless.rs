@@ -11,6 +11,7 @@ pub async fn execute(
     claude_args: &[String],
     source: ExecutionSource,
     app_handle: &tauri::AppHandle,
+    timeout_secs: u64,
 ) -> AppResult<ExecutionLog> {
     let id = Uuid::new_v4().to_string();
     let started_at = Utc::now();
@@ -49,8 +50,8 @@ pub async fn execute(
 
     let mut cmd = tokio::process::Command::from(std_cmd);
 
-    let timeout_secs = std::time::Duration::from_secs(300);
-    let timeout_result = tokio::time::timeout(timeout_secs, cmd.output()).await;
+    let timeout_dur = std::time::Duration::from_secs(timeout_secs);
+    let timeout_result = tokio::time::timeout(timeout_dur, cmd.output()).await;
 
     let completed_at = Utc::now();
     let duration_ms = (completed_at - started_at).num_milliseconds() as u64;
@@ -59,7 +60,7 @@ pub async fn execute(
         Err(_) => (
             ExecutionStatus::Failed,
             String::new(),
-            "Claude execution timed out (300s)".to_string(),
+            format!("Claude execution timed out ({}s)", timeout_secs),
             None,
         ),
         Ok(Err(e)) => (

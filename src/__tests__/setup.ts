@@ -22,6 +22,7 @@ const defaultConfig: AppConfig = {
   schedules: [],
   plugins: [],
   subscriptions: [],
+  timeoutSecs: 3600,
 };
 
 const defaultTerminals: TerminalInfo[] = [

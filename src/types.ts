@@ -9,6 +9,7 @@ export interface AppConfig {
   schedules: ScheduleConfig[];
   plugins: PluginConfig[];
   subscriptions: SubscriptionConfig[];
+  timeoutSecs: number;
 }
 
 export type TerminalType = "Auto" | "Pwsh" | "PowerShell" | "Cmd" | "Wsl";

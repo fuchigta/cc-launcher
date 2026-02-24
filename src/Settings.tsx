@@ -9,6 +9,7 @@ function Settings() {
   const [shortcutInput, setShortcutInput] = useState("");
   const [selectedTerminal, setSelectedTerminal] = useState<TerminalType>("Auto");
   const [selectedWslShell, setSelectedWslShell] = useState<WslShell>("Bash");
+  const [timeoutInput, setTimeoutInput] = useState<number>(3600);
   const [status, setStatus] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
 
@@ -24,6 +25,7 @@ function Settings() {
       setShortcutInput(cfg.shortcut);
       setSelectedTerminal(cfg.terminal);
       setSelectedWslShell(cfg.wslShell ?? "Bash");
+      setTimeoutInput(cfg.timeoutSecs ?? 3600);
     } catch (error) {
       console.error("Failed to load config:", error);
     }
@@ -71,6 +73,7 @@ function Settings() {
       shortcut: shortcutInput,
       terminal: selectedTerminal,
       wslShell: selectedWslShell,
+      timeoutSecs: timeoutInput,
     };
 
     try {
@@ -157,6 +160,18 @@ function Settings() {
           </select>
         </div>
       )}
+
+      <div className="settings-section">
+        <label>Execution Timeout (seconds)</label>
+        <input
+          type="number"
+          min={60}
+          value={timeoutInput}
+          onChange={(e) => setTimeoutInput(Number(e.target.value))}
+          className="terminal-select"
+        />
+        <small>Default: 3600 (1 hour)</small>
+      </div>
 
       {status && <div className="status-message">{status}</div>}
 
