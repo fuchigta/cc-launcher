@@ -1,4 +1,4 @@
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::logs;
 use crate::models::{ExecutionLog, ExecutionSource, ExecutionStatus};
 use chrono::Utc;
@@ -14,6 +14,24 @@ pub async fn execute(
 ) -> AppResult<ExecutionLog> {
     let id = Uuid::new_v4().to_string();
     let started_at = Utc::now();
+
+    // Running ログを書き込んで execution-started イベントを発火
+    let running_log = ExecutionLog {
+        id: id.clone(),
+        source: source.clone(),
+        prompt: prompt.to_string(),
+        working_dir: working_dir.map(|s| s.to_string()),
+        claude_args: claude_args.to_vec(),
+        status: ExecutionStatus::Running,
+        stdout: String::new(),
+        stderr: String::new(),
+        exit_code: None,
+        started_at,
+        completed_at: None,
+        duration_ms: None,
+    };
+    logs::write_log(&running_log).ok();
+    let _ = app_handle.emit("execution-started", &running_log);
 
     let mut std_cmd = crate::windows_util::no_window_command("claude");
     std_cmd.arg("--print");
@@ -32,21 +50,37 @@ pub async fn execute(
     let mut cmd = tokio::process::Command::from(std_cmd);
 
     let timeout_secs = std::time::Duration::from_secs(300);
-    let output = tokio::time::timeout(timeout_secs, cmd.output())
-        .await
-        .map_err(|_| AppError::Execution("Claude execution timed out (300s)".to_string()))?
-        .map_err(|e| AppError::Execution(format!("Failed to execute claude: {}", e)))?;
+    let timeout_result = tokio::time::timeout(timeout_secs, cmd.output()).await;
 
     let completed_at = Utc::now();
     let duration_ms = (completed_at - started_at).num_milliseconds() as u64;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let exit_code = output.status.code();
-
-    let status = match output.status.success() {
-        true => ExecutionStatus::Success,
-        false => ExecutionStatus::Failed,
+    let (status, stdout, stderr, exit_code) = match timeout_result {
+        Err(_) => (
+            ExecutionStatus::Failed,
+            String::new(),
+            "Claude execution timed out (300s)".to_string(),
+            None,
+        ),
+        Ok(Err(e)) => (
+            ExecutionStatus::Failed,
+            String::new(),
+            format!("Failed to execute claude: {}", e),
+            None,
+        ),
+        Ok(Ok(output)) => {
+            let status = if output.status.success() {
+                ExecutionStatus::Success
+            } else {
+                ExecutionStatus::Failed
+            };
+            (
+                status,
+                String::from_utf8_lossy(&output.stdout).to_string(),
+                String::from_utf8_lossy(&output.stderr).to_string(),
+                output.status.code(),
+            )
+        }
     };
 
     let log = ExecutionLog {

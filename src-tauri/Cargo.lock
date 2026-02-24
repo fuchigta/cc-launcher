@@ -476,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "cc-launcher"
-version = "0.11.0"
+version = "0.12.1"
 dependencies = [
  "chrono",
  "dirs 5.0.1",

@@ -22,11 +22,15 @@ function LogsTab() {
 
   useEffect(() => {
     loadLogs();
-    const unlisten = listen("execution-completed", () => {
+    const unlistenStarted = listen("execution-started", () => {
+      loadLogs();
+    });
+    const unlistenCompleted = listen("execution-completed", () => {
       loadLogs();
     });
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenStarted.then((fn) => fn());
+      unlistenCompleted.then((fn) => fn());
     };
   }, [offset]);
 
