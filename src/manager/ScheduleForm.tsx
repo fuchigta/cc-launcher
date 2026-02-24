@@ -117,7 +117,7 @@ function ScheduleForm({ schedule, onSave, onCancel }: ScheduleFormProps) {
 
       {exprType === "DailyAt" && (
         <div className="form-group">
-          <label>Time (HH:MM)</label>
+          <label>Time (HH:MM, ローカル時刻)</label>
           <input
             className="form-input"
             type="time"

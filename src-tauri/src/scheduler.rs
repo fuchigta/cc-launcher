@@ -1,6 +1,7 @@
 use crate::config::AppConfig;
 use crate::headless;
 use crate::models::{ExecutionSource, ScheduleConfig, ScheduleExpression};
+use chrono::{Local, TimeZone, Timelike};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_cron_scheduler::{Job, JobScheduler};
@@ -117,7 +118,18 @@ impl SchedulerManager {
                 let minute: u32 = parts[1]
                     .parse()
                     .map_err(|_| format!("Invalid minute: {}", parts[1]))?;
-                cron_expr_owned = format!("0 {} {} * * *", minute, hour);
+
+                // ローカル時刻 → UTC変換（cron式はUTC基準のため）
+                let naive = chrono::NaiveTime::from_hms_opt(hour, minute, 0)
+                    .ok_or_else(|| format!("Invalid time: {}:{}", hour, minute))?;
+                let local_dt = Local::now().date_naive().and_time(naive);
+                let local_datetime = Local
+                    .from_local_datetime(&local_dt)
+                    .single()
+                    .ok_or_else(|| format!("Ambiguous local time: {}:{}", hour, minute))?;
+                let utc = local_datetime.with_timezone(&chrono::Utc);
+
+                cron_expr_owned = format!("0 {} {} * * *", utc.minute(), utc.hour());
                 Job::new_async(cron_expr_owned.as_str(), make_callback!())
                     .map_err(|e| format!("Invalid daily schedule: {}", e))?
             }
