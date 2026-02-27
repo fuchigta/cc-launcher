@@ -3,10 +3,11 @@ members = [".", "plugins/folder-watcher", "plugins/imap-watcher"]
 
 [package]
 name = "cc-launcher"
-version = "0.16.4"
+version = "0.16.5"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
+default-run = "cc-launcher"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
