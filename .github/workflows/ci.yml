@@ -46,6 +46,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path src-tauri/plugins/bin
           New-Item -ItemType File -Force -Path src-tauri/plugins/bin/folder-watcher.exe
           New-Item -ItemType File -Force -Path src-tauri/plugins/bin/imap-watcher.exe
+          New-Item -ItemType Directory -Force -Path cli/bin
+          New-Item -ItemType File -Force -Path cli/bin/cc-launcher-cli.exe
         shell: pwsh
 
       - name: Run all checks
