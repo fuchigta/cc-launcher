@@ -24,8 +24,5 @@
       </Component>
     </DirectoryRef>
 
-    <FeatureRef Id="MainProgram">
-      <ComponentRef Id="SystemPath" />
-    </FeatureRef>
   </Fragment>
 </Wix>
