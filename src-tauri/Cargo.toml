@@ -3,7 +3,7 @@ members = [".", "plugins/folder-watcher", "plugins/imap-watcher"]
 
 [package]
 name = "cc-launcher"
-version = "0.15.0"
+version = "0.16.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -36,4 +36,10 @@ uuid = { version = "1", features = ["v4"] }
 tokio-cron-scheduler = "0.13"
 thiserror = "2"
 ts-rs = { version = "10", features = ["chrono-impl", "serde-json-impl"] }
+clap = { version = "4", features = ["derive"] }
+notify = "8"
+
+[[bin]]
+name = "cc-launcher-cli"
+path = "src/bin/cli.rs"
 

@@ -8,3 +8,6 @@
 
 # Built plugin binaries
 /plugins/bin/
+
+# Built CLI binary
+/cli/bin/

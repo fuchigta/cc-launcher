@@ -476,10 +476,12 @@ dependencies = [
 
 [[package]]
 name = "cc-launcher"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "chrono",
+ "clap",
  "dirs 5.0.1",
+ "notify",
  "serde",
  "serde_json",
  "tauri",

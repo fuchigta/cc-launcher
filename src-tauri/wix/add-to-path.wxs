@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Add the installation directory to the system PATH so that
+  cc-launcher-cli.exe (and cc-launcher.exe) can be called from any terminal.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="SystemPath" Guid="*">
+        <!-- Append INSTALLDIR to the machine-wide PATH (requires admin, consistent with perMachine install) -->
+        <Environment Id="SystemPathEnv"
+                     Name="PATH"
+                     Value="[INSTALLDIR]"
+                     Permanent="no"
+                     Part="last"
+                     Action="set"
+                     System="yes" />
+        <RegistryValue Root="HKLM"
+                       Key="Software\cc-launcher\cc-launcher"
+                       Name="SystemPath"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <FeatureRef Id="MainProgram">
+      <ComponentRef Id="SystemPath" />
+    </FeatureRef>
+  </Fragment>
+</Wix>

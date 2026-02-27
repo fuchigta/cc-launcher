@@ -1,8 +1,8 @@
-mod config;
-mod error;
+pub mod config;
+pub mod error;
 mod headless;
 mod logs;
-mod models;
+pub mod models;
 mod plugin_host;
 mod scheduler;
 mod subscription;
@@ -691,6 +691,70 @@ pub fn run() {
                             .process_event(&plugin_name, &event, &app_for_events)
                             .await;
                     }
+                }
+            });
+
+            // File watcher: reload config when config.json is modified externally (e.g. by CLI)
+            let app_handle_watcher = app.handle().clone();
+            let config_path_watch = AppConfig::config_path();
+            let config_dir = config_path_watch
+                .parent()
+                .unwrap_or(&config_path_watch)
+                .to_path_buf();
+
+            std::thread::spawn(move || {
+                use notify::{RecursiveMode, Watcher};
+                use std::sync::mpsc;
+
+                let (tx, rx) = mpsc::sync_channel::<()>(1);
+                let config_path_clone = config_path_watch.clone();
+
+                let watcher_result =
+                    notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+                        if let Ok(event) = res {
+                            if matches!(event.kind, notify::EventKind::Modify(_))
+                                && event
+                                    .paths
+                                    .iter()
+                                    .any(|p| p.file_name() == config_path_clone.file_name())
+                            {
+                                let _ = tx.try_send(());
+                            }
+                        }
+                    });
+
+                let mut watcher = match watcher_result {
+                    Ok(w) => w,
+                    Err(e) => {
+                        eprintln!("Failed to create file watcher: {}", e);
+                        return;
+                    }
+                };
+
+                if let Err(e) = watcher.watch(&config_dir, RecursiveMode::NonRecursive) {
+                    eprintln!("Failed to watch config dir: {}", e);
+                    return;
+                }
+
+                while rx.recv().is_ok() {
+                    // Debounce: drain extra events
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    while rx.try_recv().is_ok() {}
+
+                    let config = AppConfig::load();
+                    let app_clone = app_handle_watcher.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = reload_scheduler(&app_clone, &config).await {
+                            eprintln!("Config watcher: failed to reload scheduler: {}", e);
+                        }
+                        reload_subscriptions(&app_clone, &config).await;
+                        let state = app_clone.state::<AppState>();
+                        let guard = state.plugin_manager.read().await;
+                        if let Some(pm) = guard.as_ref() {
+                            pm.stop_all().await;
+                            pm.start_all(&config.plugins).await;
+                        }
+                    });
                 }
             });
 
