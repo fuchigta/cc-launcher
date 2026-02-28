@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "fs";
 import path from "path";
+import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,5 +40,12 @@ let cargoToml = fs.readFileSync(cargoTomlPath, "utf-8");
 cargoToml = cargoToml.replace(/^version = ".*"$/m, `version = "${version}"`);
 fs.writeFileSync(cargoTomlPath, cargoToml);
 console.log(`Updated Cargo.toml to ${version}`);
+
+// Cargo.lock（cargo updateでCargo.tomlの変更を反映）
+execSync("cargo update --workspace --manifest-path src-tauri/Cargo.toml", {
+  cwd: rootDir,
+  stdio: "inherit",
+});
+console.log(`Updated Cargo.lock to ${version}`);
 
 console.log(`\nAll files updated to version ${version}`);
