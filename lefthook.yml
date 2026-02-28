@@ -7,6 +7,9 @@ pre-commit:
     rs-check:
       glob: "src-tauri/**/*.rs"
       run: pnpm rs:lint && pnpm rs:fmt:check
+    ts-generate:
+      glob: "src-tauri/src/{models,config}.rs"
+      run: pnpm ts:generate && git add src-tauri/bindings/
     js-check:
       glob: "scripts/**/*.{js,mjs}"
       run: pnpm js:lint && pnpm js:fmt:check

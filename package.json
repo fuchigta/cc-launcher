@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "bump": "node scripts/bump-version.mjs",
+    "tag": "node scripts/tag-version.mjs",
     "ts:lint": "oxlint src/",
     "js:lint": "oxlint scripts/",
     "js:fmt": "oxfmt --write scripts/",
