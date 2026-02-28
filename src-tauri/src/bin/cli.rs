@@ -148,12 +148,75 @@ fn read_prompt(value: &str) -> Result<String, Box<dyn std::error::Error>> {
         use std::io::Read;
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
-        Ok(buf
-            .trim_end_matches('\n')
-            .trim_end_matches('\r')
-            .to_string())
+        Ok(buf.trim_end_matches(['\r', '\n']).to_string())
     } else {
         Ok(value.to_string())
+    }
+}
+
+trait Identifiable {
+    fn id(&self) -> &str;
+    fn name(&self) -> &str;
+    fn type_name() -> &'static str;
+}
+
+impl Identifiable for ScheduleConfig {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn type_name() -> &'static str {
+        "Schedule"
+    }
+}
+
+impl Identifiable for PluginConfig {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn type_name() -> &'static str {
+        "Plugin"
+    }
+}
+
+impl Identifiable for SubscriptionConfig {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn type_name() -> &'static str {
+        "Subscription"
+    }
+}
+
+fn find_by_id_or_name<T: Identifiable>(items: &[T], id_or_name: &str) -> Result<String, String> {
+    let matches: Vec<_> = items
+        .iter()
+        .filter(|item| {
+            item.id() == id_or_name
+                || item.name() == id_or_name
+                || item.id().starts_with(id_or_name)
+        })
+        .collect();
+    match matches.as_slice() {
+        [] => Err(format!("{} not found: {id_or_name}", T::type_name())),
+        [item] => Ok(item.id().to_string()),
+        _ => Err(format!(
+            "Ambiguous ID prefix '{}': matches {}",
+            id_or_name,
+            matches
+                .iter()
+                .map(|item| format!("{} ({})", short_id(item.id()), item.name()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
     }
 }
 
@@ -226,7 +289,7 @@ fn handle_schedule(action: ScheduleAction, json: bool) -> Result<(), Box<dyn std
         }
         ScheduleAction::Delete { id } => {
             let mut config = AppConfig::load();
-            let resolved = find_schedule_id(&config.schedules, &id)?;
+            let resolved = find_by_id_or_name(&config.schedules, &id)?;
             config.schedules.retain(|s| s.id != resolved);
             config.save()?;
             if json {
@@ -243,7 +306,7 @@ fn handle_schedule(action: ScheduleAction, json: bool) -> Result<(), Box<dyn std
 
 fn toggle_schedule(id: &str, enabled: bool, json: bool) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::load();
-    let resolved = find_schedule_id(&config.schedules, id)?;
+    let resolved = find_by_id_or_name(&config.schedules, id)?;
     config
         .schedules
         .iter_mut()
@@ -258,26 +321,6 @@ fn toggle_schedule(id: &str, enabled: bool, json: bool) -> Result<(), Box<dyn st
         println!("{state} schedule: {resolved}");
     }
     Ok(())
-}
-
-fn find_schedule_id(schedules: &[ScheduleConfig], id_or_name: &str) -> Result<String, String> {
-    let matches: Vec<_> = schedules
-        .iter()
-        .filter(|s| s.id == id_or_name || s.name == id_or_name || s.id.starts_with(id_or_name))
-        .collect();
-    match matches.as_slice() {
-        [] => Err(format!("Schedule not found: {id_or_name}")),
-        [s] => Ok(s.id.clone()),
-        _ => Err(format!(
-            "Ambiguous ID prefix '{}': matches {}",
-            id_or_name,
-            matches
-                .iter()
-                .map(|s| format!("{} ({})", &s.id[..8], s.name))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )),
-    }
 }
 
 fn print_schedules(schedules: &[ScheduleConfig]) {
@@ -344,7 +387,7 @@ fn handle_plugin(action: PluginAction, json: bool) -> Result<(), Box<dyn std::er
         }
         PluginAction::Delete { id } => {
             let mut config = AppConfig::load();
-            let resolved = find_plugin_id(&config.plugins, &id)?;
+            let resolved = find_by_id_or_name(&config.plugins, &id)?;
             config.plugins.retain(|p| p.id != resolved);
             config.save()?;
             if json {
@@ -361,7 +404,7 @@ fn handle_plugin(action: PluginAction, json: bool) -> Result<(), Box<dyn std::er
 
 fn toggle_plugin(id: &str, enabled: bool, json: bool) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::load();
-    let resolved = find_plugin_id(&config.plugins, id)?;
+    let resolved = find_by_id_or_name(&config.plugins, id)?;
     config
         .plugins
         .iter_mut()
@@ -376,26 +419,6 @@ fn toggle_plugin(id: &str, enabled: bool, json: bool) -> Result<(), Box<dyn std:
         println!("{state} plugin: {resolved}");
     }
     Ok(())
-}
-
-fn find_plugin_id(plugins: &[PluginConfig], id_or_name: &str) -> Result<String, String> {
-    let matches: Vec<_> = plugins
-        .iter()
-        .filter(|p| p.id == id_or_name || p.name == id_or_name || p.id.starts_with(id_or_name))
-        .collect();
-    match matches.as_slice() {
-        [] => Err(format!("Plugin not found: {id_or_name}")),
-        [p] => Ok(p.id.clone()),
-        _ => Err(format!(
-            "Ambiguous ID prefix '{}': matches {}",
-            id_or_name,
-            matches
-                .iter()
-                .map(|p| format!("{} ({})", &p.id[..8], p.name))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )),
-    }
 }
 
 fn print_plugins(plugins: &[PluginConfig]) {
@@ -462,7 +485,7 @@ fn handle_subscription(
         }
         SubscriptionAction::Delete { id } => {
             let mut config = AppConfig::load();
-            let resolved = find_subscription_id(&config.subscriptions, &id)?;
+            let resolved = find_by_id_or_name(&config.subscriptions, &id)?;
             config.subscriptions.retain(|s| s.id != resolved);
             config.save()?;
             if json {
@@ -483,7 +506,7 @@ fn toggle_subscription(
     json: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = AppConfig::load();
-    let resolved = find_subscription_id(&config.subscriptions, id)?;
+    let resolved = find_by_id_or_name(&config.subscriptions, id)?;
     config
         .subscriptions
         .iter_mut()
@@ -498,26 +521,6 @@ fn toggle_subscription(
         println!("{state} subscription: {resolved}");
     }
     Ok(())
-}
-
-fn find_subscription_id(subs: &[SubscriptionConfig], id_or_name: &str) -> Result<String, String> {
-    let matches: Vec<_> = subs
-        .iter()
-        .filter(|s| s.id == id_or_name || s.name == id_or_name || s.id.starts_with(id_or_name))
-        .collect();
-    match matches.as_slice() {
-        [] => Err(format!("Subscription not found: {id_or_name}")),
-        [s] => Ok(s.id.clone()),
-        _ => Err(format!(
-            "Ambiguous ID prefix '{}': matches {}",
-            id_or_name,
-            matches
-                .iter()
-                .map(|s| format!("{} ({})", &s.id[..8], s.name))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )),
-    }
 }
 
 fn print_subscriptions(subs: &[SubscriptionConfig]) {
