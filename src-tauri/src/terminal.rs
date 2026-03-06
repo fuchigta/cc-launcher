@@ -217,8 +217,12 @@ pub fn launch_claude(
             };
             let escaped = prompt.replace("'", "''");
             let claude_cmd = format!("claude '{}'", escaped);
-            if let Some(dir) = working_dir {
-                args.extend(["-d".to_string(), dir.to_string()]);
+            let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
+                crate::windows_util::default_working_dir()
+                    .and_then(|p| p.to_str().map(|s| s.to_string()))
+            });
+            if let Some(dir) = effective_dir {
+                args.extend(["-d".to_string(), dir]);
             }
             args.extend([
                 "--".to_string(),
@@ -231,8 +235,12 @@ pub fn launch_claude(
         TerminalType::Cmd => {
             let escaped = escape_cmd_meta(prompt);
             let claude_cmd = format!("claude \"{}\"", escaped);
-            if let Some(dir) = working_dir {
-                args.extend(["-d".to_string(), dir.to_string()]);
+            let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
+                crate::windows_util::default_working_dir()
+                    .and_then(|p| p.to_str().map(|s| s.to_string()))
+            });
+            if let Some(dir) = effective_dir {
+                args.extend(["-d".to_string(), dir]);
             }
             args.extend([
                 "--".to_string(),

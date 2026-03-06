@@ -44,7 +44,10 @@ pub async fn execute(
     std_cmd.stdout(std::process::Stdio::piped());
     std_cmd.stderr(std::process::Stdio::piped());
 
-    if let Some(dir) = working_dir {
+    let effective_dir = working_dir
+        .map(std::path::PathBuf::from)
+        .or_else(crate::windows_util::default_working_dir);
+    if let Some(dir) = effective_dir {
         std_cmd.current_dir(dir);
     }
 
