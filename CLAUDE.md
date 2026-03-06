@@ -14,14 +14,14 @@ pnpm install        # 依存関係インストール
 pnpm tauri dev      # 開発モード
 pnpm tauri build    # 本番ビルド
 pnpm bump <version> # バージョン一括更新（Cargo.lockも自動更新）
-pnpm tag            # 現在バージョンのgitタグを作成（コミット後に実行）
+pnpm tag            # 現在バージョンのgitタグを作成してmain・タグをpush（コミット後に実行）
 ```
 
 ## 重要な同期ポイント
 
 | 変更内容 | 更新が必要なファイル |
 |----------|---------------------|
-| バージョン更新 | `pnpm bump <version>`（Cargo.lockも自動更新）→ コミット → `pnpm tag` → `git push origin main --follow-tags` |
+| バージョン更新 | `pnpm bump <version>`（Cargo.lockも自動更新）→ コミット → `pnpm tag`（タグ作成＋push自動実行） |
 | Tauriコマンド追加 | src-tauri/src/lib.rs のみ（型定義は自動生成） |
 | Rust型定義の変更 | `#[derive(ts_rs::TS)] #[ts(export)]`付き構造体を変更するとpre-commitフックが`pnpm ts:generate`を自動実行してsrc-tauri/bindings/を更新する。必要に応じてsrc/types.tsから該当型をimportに置き換え |
 
