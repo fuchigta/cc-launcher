@@ -50,6 +50,10 @@ console.log(`Updated Cargo.lock to ${version}`);
 
 // CHANGELOG.md を git-cliff で更新
 const tag = `v${version}`;
+const changelogPath = path.join(rootDir, "CHANGELOG.md");
+if (!fs.existsSync(changelogPath)) {
+  fs.writeFileSync(changelogPath, "");
+}
 try {
   execSync(`git cliff --unreleased --tag ${tag} --prepend CHANGELOG.md`, {
     cwd: rootDir,
