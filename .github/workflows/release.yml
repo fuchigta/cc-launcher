@@ -59,7 +59,12 @@ jobs:
         run: pnpm test:all
 
       - name: Generate release notes
-        run: git cliff --latest --strip all -o release_notes.txt
+        id: release_notes
+        run: |
+          git cliff --latest --strip all -o release_notes.txt
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Build and release
@@ -69,6 +74,6 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Claude Code Launcher v__VERSION__'
-          releaseBodyPath: release_notes.txt
+          releaseBody: ${{ steps.release_notes.outputs.content }}
           releaseDraft: false
           prerelease: false
