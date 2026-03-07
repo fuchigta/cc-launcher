@@ -18,6 +18,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -50,8 +52,15 @@ jobs:
           New-Item -ItemType File -Force -Path src-tauri/cli/bin/cc-launcher-cli.exe
         shell: pwsh
 
+      - name: Install git-cliff
+        run: cargo install git-cliff --locked
+
       - name: Run tests
         run: pnpm test:all
+
+      - name: Generate release notes
+        run: git cliff --latest --strip all -o release_notes.txt
+        shell: bash
 
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
@@ -60,12 +69,6 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Claude Code Launcher v__VERSION__'
-          releaseBody: |
-            ## インストール
-            `.msi`ファイルをダウンロードして実行してください。
-
-            ## 前提条件
-            - Windows 10/11
-            - `claude`コマンドがPATHに存在すること
-          releaseDraft: true
+          releaseBodyPath: release_notes.txt
+          releaseDraft: false
           prerelease: false

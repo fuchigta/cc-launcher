@@ -48,4 +48,17 @@ execSync("cargo update --workspace --manifest-path src-tauri/Cargo.toml", {
 });
 console.log(`Updated Cargo.lock to ${version}`);
 
+// CHANGELOG.md を git-cliff で更新
+const tag = `v${version}`;
+try {
+  execSync(`git cliff --unreleased --tag ${tag} --prepend CHANGELOG.md`, {
+    cwd: rootDir,
+    stdio: "inherit",
+  });
+  console.log(`Updated CHANGELOG.md for ${tag}`);
+} catch {
+  console.error("git-cliff failed. Install with: cargo install git-cliff");
+  process.exit(1);
+}
+
 console.log(`\nAll files updated to version ${version}`);
