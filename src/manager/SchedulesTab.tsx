@@ -50,6 +50,10 @@ function SchedulesTab() {
     }
   };
 
+  const handleDuplicate = (s: ScheduleConfig) => {
+    handleEdit({ ...s, id: crypto.randomUUID(), name: `Copy of ${s.name}` });
+  };
+
   return (
     <>
       <CrudTabLayout
@@ -77,6 +81,9 @@ function SchedulesTab() {
             <td>
               <button className="btn btn-sm btn-secondary" onClick={() => handleTestRun(s.id)}>
                 Run
+              </button>{" "}
+              <button className="btn btn-sm btn-secondary" onClick={() => handleDuplicate(s)}>
+                Duplicate
               </button>{" "}
               <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(s)}>
                 Edit

@@ -78,6 +78,10 @@ function PluginsTab() {
     }
   };
 
+  const handleDuplicate = (p: PluginConfig) => {
+    handleEdit({ ...p, id: crypto.randomUUID(), name: `Copy of ${p.name}` });
+  };
+
   return (
     <>
       <CrudTabLayout
@@ -107,6 +111,9 @@ function PluginsTab() {
               <td>
                 <button className="btn btn-sm btn-secondary" onClick={() => handleRestart(p.id)}>
                   Restart
+                </button>{" "}
+                <button className="btn btn-sm btn-secondary" onClick={() => handleDuplicate(p)}>
+                  Duplicate
                 </button>{" "}
                 <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(p)}>
                   Edit

@@ -29,6 +29,10 @@ function SubscriptionsTab() {
     toggle: toggleSubscription,
   });
 
+  const handleDuplicate = (s: SubscriptionConfig) => {
+    handleEdit({ ...s, id: crypto.randomUUID(), name: `Copy of ${s.name}` });
+  };
+
   return (
     <>
       <CrudTabLayout
@@ -55,6 +59,9 @@ function SubscriptionsTab() {
             <td>{s.eventType}</td>
             <td className="truncated-cell">{s.promptTemplate}</td>
             <td>
+              <button className="btn btn-sm btn-secondary" onClick={() => handleDuplicate(s)}>
+                Duplicate
+              </button>{" "}
               <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(s)}>
                 Edit
               </button>{" "}
