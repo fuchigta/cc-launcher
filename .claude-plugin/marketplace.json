@@ -14,13 +14,18 @@
         "repo": "fuchigta/cc-launcher"
       },
       "description": "Claude Code Launcher - タスクトレイ常駐型Claudeランチャー（Windows向け）。cc-launcher-cli を使ったスケジュール・プラグイン・サブスクリプション管理スキルを提供する。",
-      "version": "0.17.6",
+      "version": "0.17.7",
       "author": {
         "name": "fuchigta"
       },
       "homepage": "https://github.com/fuchigta/cc-launcher",
       "repository": "https://github.com/fuchigta/cc-launcher",
-      "keywords": ["cc-launcher", "scheduler", "windows", "tauri"]
+      "keywords": [
+        "cc-launcher",
+        "scheduler",
+        "windows",
+        "tauri"
+      ]
     }
   ]
 }
