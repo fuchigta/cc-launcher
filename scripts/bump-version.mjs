@@ -48,6 +48,20 @@ execSync("cargo update --workspace --manifest-path src-tauri/Cargo.toml", {
 });
 console.log(`Updated Cargo.lock to ${version}`);
 
+// .claude-plugin/plugin.json
+const pluginJsonPath = path.join(rootDir, ".claude-plugin", "plugin.json");
+const pluginJson = JSON.parse(fs.readFileSync(pluginJsonPath, "utf-8"));
+pluginJson.version = version;
+fs.writeFileSync(pluginJsonPath, JSON.stringify(pluginJson, null, 2) + "\n");
+console.log(`Updated .claude-plugin/plugin.json to ${version}`);
+
+// .claude-plugin/marketplace.json
+const marketplaceJsonPath = path.join(rootDir, ".claude-plugin", "marketplace.json");
+const marketplaceJson = JSON.parse(fs.readFileSync(marketplaceJsonPath, "utf-8"));
+marketplaceJson.plugins[0].version = version;
+fs.writeFileSync(marketplaceJsonPath, JSON.stringify(marketplaceJson, null, 2) + "\n");
+console.log(`Updated .claude-plugin/marketplace.json to ${version}`);
+
 // CHANGELOG.md を git-cliff で更新
 const tag = `v${version}`;
 const changelogPath = path.join(rootDir, "CHANGELOG.md");
