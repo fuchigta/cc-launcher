@@ -11,7 +11,7 @@ const { version } = JSON.parse(readFileSync(path.join(rootDir, "package.json"), 
 const tag = `v${version}`;
 
 try {
-  execSync(`git tag ${tag}`, { cwd: rootDir, stdio: "inherit" });
+  execSync(`git tag -a ${tag} -m "Release ${tag}"`, { cwd: rootDir, stdio: "inherit" });
   console.log(`Created tag: ${tag}`);
 } catch {
   console.error(`Failed to create tag ${tag}. Already exists?`);
