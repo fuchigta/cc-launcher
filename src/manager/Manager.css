@@ -1,7 +1,8 @@
 .manager-container {
   padding: 24px;
   background: #1e1e1e;
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   color: #f6f6f6;
 }
 
