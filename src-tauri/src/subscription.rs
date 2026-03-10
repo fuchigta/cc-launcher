@@ -1,4 +1,3 @@
-use crate::config::AppConfig;
 use crate::headless;
 use crate::models::{ExecutionSource, PluginEvent, SubscriptionConfig};
 use std::sync::Arc;
@@ -49,10 +48,7 @@ impl SubscriptionEngine {
             let app = app_handle.clone();
 
             tokio::spawn(async move {
-                let timeout_secs = AppConfig::load().timeout_secs;
-                if let Err(e) =
-                    headless::execute(&prompt, wd.as_deref(), &args, source, &app, timeout_secs)
-                        .await
+                if let Err(e) = headless::execute(&prompt, wd.as_deref(), &args, source, &app).await
                 {
                     eprintln!("Subscription execution failed: {}", e);
                 }

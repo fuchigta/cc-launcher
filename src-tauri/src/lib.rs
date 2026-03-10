@@ -6,7 +6,7 @@ pub mod models;
 mod plugin_host;
 mod scheduler;
 mod subscription;
-mod terminal;
+pub(crate) mod terminal;
 mod windows_util;
 
 use std::sync::Arc;
@@ -44,14 +44,12 @@ async fn run_headless(
     claude_args: Option<Vec<String>>,
 ) -> AppResult<String> {
     let args = claude_args.unwrap_or_default();
-    let timeout_secs = AppConfig::load().timeout_secs;
     let log = headless::execute(
         &prompt,
         working_dir.as_deref(),
         &args,
         ExecutionSource::Manual,
         &app_handle,
-        timeout_secs,
     )
     .await?;
     Ok(log.id)
@@ -155,7 +153,6 @@ async fn test_run_schedule(app_handle: tauri::AppHandle, id: String) -> AppResul
         .find(|s| s.id == id)
         .ok_or_else(|| AppError::NotFound("Schedule not found".to_string()))?;
 
-    let timeout_secs = config.timeout_secs;
     let log = headless::execute(
         &schedule.prompt,
         schedule.working_dir.as_deref(),
@@ -165,7 +162,6 @@ async fn test_run_schedule(app_handle: tauri::AppHandle, id: String) -> AppResul
             name: schedule.name.clone(),
         },
         &app_handle,
-        timeout_secs,
     )
     .await?;
     Ok(log.id)

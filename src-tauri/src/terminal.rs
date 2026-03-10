@@ -149,7 +149,7 @@ impl TerminalDetector {
     }
 }
 
-fn escape_cmd_meta(s: &str) -> String {
+pub(crate) fn escape_cmd_meta(s: &str) -> String {
     let mut result = String::with_capacity(s.len() * 2);
     for c in s.chars() {
         match c {
@@ -163,6 +163,14 @@ fn escape_cmd_meta(s: &str) -> String {
         }
     }
     result
+}
+
+pub(crate) fn wsl_shell_name(shell: &crate::config::WslShell) -> &'static str {
+    match shell {
+        crate::config::WslShell::Bash => "bash",
+        crate::config::WslShell::Zsh => "zsh",
+        crate::config::WslShell::Sh => "sh",
+    }
 }
 
 pub fn launch_claude(

@@ -1,4 +1,3 @@
-use crate::config::AppConfig;
 use crate::headless;
 use crate::models::{ExecutionSource, ScheduleConfig, ScheduleExpression};
 use chrono::Local;
@@ -78,7 +77,6 @@ impl SchedulerManager {
                     let sid = schedule_id.clone();
                     let sname = schedule_name.clone();
                     Box::pin(async move {
-                        let timeout_secs = AppConfig::load().timeout_secs;
                         let _ = headless::execute(
                             &p,
                             wd.as_deref(),
@@ -88,7 +86,6 @@ impl SchedulerManager {
                                 name: sname,
                             },
                             &app,
-                            timeout_secs,
                         )
                         .await;
                     })
