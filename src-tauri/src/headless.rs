@@ -68,7 +68,7 @@ fn build_shell_command(
                 "pwsh"
             };
             let mut cmd = crate::windows_util::no_window_command(shell);
-            cmd.args(["-NoProfile", "-Command", &claude_cmd]);
+            cmd.args(["-Command", &claude_cmd]);
             cmd
         }
     }
