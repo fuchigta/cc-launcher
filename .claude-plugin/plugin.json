@@ -1,7 +1,7 @@
 {
   "name": "cc-launcher",
   "description": "Claude Code Launcher - タスクトレイ常駐型Claudeランチャー（Windows向け）。cc-launcher-cli を使ったスケジュール・プラグイン・サブスクリプション管理スキルを提供する。",
-  "version": "0.17.12",
+  "version": "0.17.13",
   "author": {
     "name": "fuchigta"
   }
