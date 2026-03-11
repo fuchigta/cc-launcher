@@ -10,6 +10,7 @@ function Settings() {
   const [selectedTerminal, setSelectedTerminal] = useState<TerminalType>("Auto");
   const [selectedWslShell, setSelectedWslShell] = useState<WslShell>("Bash");
   const [timeoutInput, setTimeoutInput] = useState<number>(3600);
+  const [enableOnStartup, setEnableOnStartup] = useState(true);
   const [status, setStatus] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
 
@@ -26,6 +27,7 @@ function Settings() {
       setSelectedTerminal(cfg.terminal);
       setSelectedWslShell(cfg.wslShell ?? "Bash");
       setTimeoutInput(cfg.timeoutSecs ?? 3600);
+      setEnableOnStartup(cfg.enableOnStartup ?? true);
     } catch (error) {
       console.error("Failed to load config:", error);
     }
@@ -74,6 +76,7 @@ function Settings() {
       terminal: selectedTerminal,
       wslShell: selectedWslShell,
       timeoutSecs: timeoutInput,
+      enableOnStartup,
     };
 
     try {
@@ -171,6 +174,18 @@ function Settings() {
           className="terminal-select"
         />
         <small>Default: 3600 (1 hour)</small>
+      </div>
+
+      <div className="settings-section">
+        <label>
+          <input
+            type="checkbox"
+            checked={enableOnStartup}
+            onChange={(e) => setEnableOnStartup(e.target.checked)}
+          />
+          {" "}Start on Windows login
+        </label>
+        <small>Automatically launch cc-launcher when you log in to Windows</small>
       </div>
 
       {status && <div className="status-message">{status}</div>}

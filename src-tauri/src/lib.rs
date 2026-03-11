@@ -328,8 +328,32 @@ fn get_config() -> AppResult<AppConfig> {
     Ok(AppConfig::load())
 }
 
+const STARTUP_RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+const STARTUP_APP_NAME: &str = "cc-launcher";
+
+fn sync_startup_registry(enabled: bool) {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
+    use winreg::RegKey;
+
+    let Ok(hkcu) =
+        RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(STARTUP_RUN_KEY, KEY_SET_VALUE)
+    else {
+        return;
+    };
+
+    if enabled {
+        if let Ok(exe) = std::env::current_exe() {
+            let value = format!("\"{}\"", exe.to_string_lossy());
+            let _ = hkcu.set_value(STARTUP_APP_NAME, &value.as_str());
+        }
+    } else {
+        let _ = hkcu.delete_value(STARTUP_APP_NAME);
+    }
+}
+
 #[tauri::command]
 fn save_config(new_config: AppConfig) -> AppResult<()> {
+    sync_startup_registry(new_config.enable_on_startup);
     new_config.save()
 }
 
@@ -631,6 +655,7 @@ pub fn run() {
 
             // Register global shortcut
             let config = AppConfig::load();
+            sync_startup_registry(config.enable_on_startup);
             if let Some(shortcut) = parse_shortcut(&config.shortcut) {
                 let _ = app.global_shortcut().register(shortcut);
             }

@@ -10,6 +10,7 @@ export interface AppConfig {
   plugins: PluginConfig[];
   subscriptions: SubscriptionConfig[];
   timeoutSecs: number;
+  enableOnStartup: boolean;
 }
 
 export type TerminalType = "Auto" | "Pwsh" | "PowerShell" | "Cmd" | "Wsl";

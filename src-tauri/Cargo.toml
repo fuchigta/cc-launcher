@@ -39,6 +39,7 @@ thiserror = "2"
 ts-rs = { version = "10", features = ["chrono-impl", "serde-json-impl"] }
 clap = { version = "4", features = ["derive"] }
 notify = "8"
+winreg = "0.55"
 
 [[bin]]
 name = "cc-launcher-cli"

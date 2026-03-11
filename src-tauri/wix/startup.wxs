@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Register cc-launcher to run on Windows startup for the current user.
+  Removed on uninstall (Permanent="no" is the default).
+  If the user disables startup in Settings, the app will remove this entry
+  on next launch via sync_startup_registry().
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="StartupRegistration" Guid="*">
+        <RegistryValue Root="HKCU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                       Name="cc-launcher"
+                       Type="string"
+                       Value="&quot;[INSTALLDIR]cc-launcher.exe&quot;"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

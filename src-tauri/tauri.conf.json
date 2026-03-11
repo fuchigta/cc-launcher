@@ -60,10 +60,12 @@
       "wix": {
         "language": "ja-JP",
         "fragmentPaths": [
-          "wix/add-to-path.wxs"
+          "wix/add-to-path.wxs",
+          "wix/startup.wxs"
         ],
         "componentRefs": [
-          "SystemPath"
+          "SystemPath",
+          "StartupRegistration"
         ]
       }
     },
