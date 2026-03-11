@@ -106,6 +106,7 @@ describe("Settings", () => {
       plugins: [],
       subscriptions: [],
       timeoutSecs: 3600,
+      enableOnStartup: false,
     } as AppConfig);
 
     commandMocks.getAvailableTerminals.mockResolvedValue([

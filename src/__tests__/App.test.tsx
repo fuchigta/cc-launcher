@@ -32,6 +32,7 @@ describe("App", () => {
       plugins: [],
       subscriptions: [],
       timeoutSecs: 3600,
+      enableOnStartup: false,
     } as AppConfig);
 
     render(<App />);
@@ -108,6 +109,7 @@ describe("App", () => {
       plugins: [],
       subscriptions: [],
       timeoutSecs: 3600,
+      enableOnStartup: false,
     } as AppConfig);
 
     render(<App />);
@@ -142,6 +144,7 @@ describe("App", () => {
       plugins: [],
       subscriptions: [],
       timeoutSecs: 3600,
+      enableOnStartup: false,
     } as AppConfig);
 
     render(<App />);

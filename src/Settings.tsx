@@ -182,8 +182,8 @@ function Settings() {
             type="checkbox"
             checked={enableOnStartup}
             onChange={(e) => setEnableOnStartup(e.target.checked)}
-          />
-          {" "}Start on Windows login
+          />{" "}
+          Start on Windows login
         </label>
         <small>Automatically launch cc-launcher when you log in to Windows</small>
       </div>
