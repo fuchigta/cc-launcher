@@ -476,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "cc-launcher"
-version = "0.17.11"
+version = "0.17.12"
 dependencies = [
  "chrono",
  "clap",
@@ -496,6 +496,7 @@ dependencies = [
  "tokio-cron-scheduler",
  "ts-rs",
  "uuid",
+ "winreg",
 ]
 
 [[package]]
