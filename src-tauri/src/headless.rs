@@ -185,6 +185,17 @@ pub async fn execute(
     Ok(log)
 }
 
+fn notification_body(prompt: &str, stdout: &str) -> String {
+    if stdout.is_empty() {
+        prompt.to_string()
+    } else if stdout.len() > 200 {
+        let end = stdout.floor_char_boundary(200);
+        format!("{}...", &stdout[..end])
+    } else {
+        stdout.to_string()
+    }
+}
+
 fn send_notification(app_handle: &tauri::AppHandle, log: &ExecutionLog) {
     use tauri_plugin_notification::NotificationExt;
 
@@ -194,14 +205,7 @@ fn send_notification(app_handle: &tauri::AppHandle, log: &ExecutionLog) {
         ExecutionStatus::Running => "Claude Code: Running",
     };
 
-    let body = if log.stdout.is_empty() {
-        log.prompt.clone()
-    } else if log.stdout.len() > 200 {
-        let end = log.stdout.floor_char_boundary(200);
-        format!("{}...", &log.stdout[..end])
-    } else {
-        log.stdout.clone()
-    };
+    let body = notification_body(&log.prompt, &log.stdout);
 
     let _ = app_handle
         .notification()
@@ -209,4 +213,98 @@ fn send_notification(app_handle: &tauri::AppHandle, log: &ExecutionLog) {
         .title(title)
         .body(&body)
         .show();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::TerminalType;
+
+    #[test]
+    fn shell_command_str_wsl_no_args() {
+        let cmd = shell_command_str("hello world", &[], &TerminalType::Wsl);
+        assert_eq!(cmd, "claude --print 'hello world'");
+    }
+
+    #[test]
+    fn shell_command_str_wsl_with_args() {
+        let cmd = shell_command_str(
+            "hello",
+            &["--dangerously-skip-permissions".to_string()],
+            &TerminalType::Wsl,
+        );
+        assert_eq!(cmd, "claude --print 'hello' --dangerously-skip-permissions");
+    }
+
+    #[test]
+    fn shell_command_str_wsl_escapes_single_quote() {
+        let cmd = shell_command_str("it's a test", &[], &TerminalType::Wsl);
+        assert_eq!(cmd, "claude --print 'it'\\''s a test'");
+    }
+
+    #[test]
+    fn shell_command_str_cmd_no_args() {
+        let cmd = shell_command_str("hello", &[], &TerminalType::Cmd);
+        assert_eq!(cmd, "claude --print \"hello\"");
+    }
+
+    #[test]
+    fn shell_command_str_cmd_escapes_meta() {
+        let cmd = shell_command_str("a & b", &[], &TerminalType::Cmd);
+        assert_eq!(cmd, "claude --print \"a ^& b\"");
+    }
+
+    #[test]
+    fn shell_command_str_powershell_no_args() {
+        let cmd = shell_command_str("hello", &[], &TerminalType::PowerShell);
+        assert_eq!(cmd, "claude --print 'hello'");
+    }
+
+    #[test]
+    fn shell_command_str_powershell_escapes_single_quote() {
+        let cmd = shell_command_str("it's a test", &[], &TerminalType::PowerShell);
+        assert_eq!(cmd, "claude --print 'it''s a test'");
+    }
+
+    #[test]
+    fn shell_command_str_pwsh_no_args() {
+        let cmd = shell_command_str("hello", &[], &TerminalType::Pwsh);
+        assert_eq!(cmd, "claude --print 'hello'");
+    }
+
+    #[test]
+    fn notification_body_empty_stdout_returns_prompt() {
+        assert_eq!(notification_body("my prompt", ""), "my prompt");
+    }
+
+    #[test]
+    fn notification_body_short_stdout_returns_stdout() {
+        assert_eq!(notification_body("prompt", "short output"), "short output");
+    }
+
+    #[test]
+    fn notification_body_exactly_200_chars_not_truncated() {
+        let exact = "a".repeat(200);
+        let body = notification_body("prompt", &exact);
+        assert_eq!(body, exact);
+    }
+
+    #[test]
+    fn notification_body_long_stdout_truncates_with_ellipsis() {
+        let long = "a".repeat(300);
+        let body = notification_body("prompt", &long);
+        assert!(body.ends_with("..."));
+        assert_eq!(body, format!("{}...", "a".repeat(200)));
+    }
+
+    #[test]
+    fn notification_body_long_multibyte_truncates_at_char_boundary() {
+        // 各文字が3バイトのUTF-8文字（例: '€' = 3バイト）
+        // 200バイト境界が文字の途中に来ないことを確認
+        let long = "あ".repeat(100); // 100文字 × 3バイト = 300バイト
+        let body = notification_body("prompt", &long);
+        assert!(body.ends_with("..."));
+        // パニックせず有効なUTF-8文字列であること
+        assert!(std::str::from_utf8(body.as_bytes()).is_ok());
+    }
 }

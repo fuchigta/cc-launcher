@@ -106,23 +106,7 @@ impl SchedulerManager {
                     .map_err(|e| format!("Invalid interval: {}", e))?
             }
             ScheduleExpression::DailyAt { time } => {
-                let parts: Vec<&str> = time.split(':').collect();
-                if parts.len() != 2 {
-                    return Err(format!("Invalid time format: {}", time));
-                }
-                let hour: u32 = parts[0]
-                    .parse()
-                    .map_err(|_| format!("Invalid hour: {}", parts[0]))?;
-                let minute: u32 = parts[1]
-                    .parse()
-                    .map_err(|_| format!("Invalid minute: {}", parts[1]))?;
-                if hour > 23 {
-                    return Err(format!("Invalid hour: {} (must be 0-23)", hour));
-                }
-                if minute > 59 {
-                    return Err(format!("Invalid minute: {} (must be 0-59)", minute));
-                }
-
+                let (hour, minute) = parse_daily_time(time)?;
                 cron_expr_owned = format!("0 {} {} * * *", minute, hour);
                 Job::new_async_tz(cron_expr_owned.as_str(), Local, make_callback!())
                     .map_err(|e| format!("Invalid daily schedule: {}", e))?
@@ -146,6 +130,26 @@ impl SchedulerManager {
             .await
             .map_err(|e| format!("Failed to shutdown scheduler: {}", e))
     }
+}
+
+fn parse_daily_time(time: &str) -> Result<(u32, u32), String> {
+    let parts: Vec<&str> = time.split(':').collect();
+    if parts.len() != 2 {
+        return Err(format!("Invalid time format: {}", time));
+    }
+    let hour: u32 = parts[0]
+        .parse()
+        .map_err(|_| format!("Invalid hour: {}", parts[0]))?;
+    let minute: u32 = parts[1]
+        .parse()
+        .map_err(|_| format!("Invalid minute: {}", parts[1]))?;
+    if hour > 23 {
+        return Err(format!("Invalid hour: {} (must be 0-23)", hour));
+    }
+    if minute > 59 {
+        return Err(format!("Invalid minute: {} (must be 0-59)", minute));
+    }
+    Ok((hour, minute))
 }
 
 fn normalize_cron_expression(expr: &str) -> Result<String, String> {
@@ -197,6 +201,45 @@ mod tests {
     fn normalize_invalid_field_count_returns_error() {
         assert!(normalize_cron_expression("9 * *").is_err());
         assert!(normalize_cron_expression("0 0 9 * * * *").is_err());
+    }
+
+    #[test]
+    fn parse_daily_time_valid() {
+        assert_eq!(parse_daily_time("9:00").unwrap(), (9, 0));
+        assert_eq!(parse_daily_time("23:59").unwrap(), (23, 59));
+        assert_eq!(parse_daily_time("0:0").unwrap(), (0, 0));
+        assert_eq!(parse_daily_time("12:30").unwrap(), (12, 30));
+    }
+
+    #[test]
+    fn parse_daily_time_cron_expr() {
+        let (hour, minute) = parse_daily_time("9:30").unwrap();
+        assert_eq!(format!("0 {} {} * * *", minute, hour), "0 30 9 * * *");
+    }
+
+    #[test]
+    fn parse_daily_time_invalid_format() {
+        assert!(parse_daily_time("9").is_err());
+        assert!(parse_daily_time("9:00:00").is_err());
+        assert!(parse_daily_time("").is_err());
+    }
+
+    #[test]
+    fn parse_daily_time_invalid_hour() {
+        assert!(parse_daily_time("24:00").is_err());
+        assert!(parse_daily_time("99:00").is_err());
+    }
+
+    #[test]
+    fn parse_daily_time_invalid_minute() {
+        assert!(parse_daily_time("9:60").is_err());
+        assert!(parse_daily_time("0:99").is_err());
+    }
+
+    #[test]
+    fn parse_daily_time_non_numeric() {
+        assert!(parse_daily_time("abc:00").is_err());
+        assert!(parse_daily_time("9:xyz").is_err());
     }
 
     #[test]
