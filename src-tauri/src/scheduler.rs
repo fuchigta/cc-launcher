@@ -96,7 +96,8 @@ impl SchedulerManager {
         let cron_expr_owned;
         let job = match &config.expression {
             ScheduleExpression::Cron { expression } => {
-                Job::new_async_tz(expression.as_str(), Local, make_callback!())
+                cron_expr_owned = normalize_cron_expression(expression.as_str())?;
+                Job::new_async_tz(cron_expr_owned.as_str(), Local, make_callback!())
                     .map_err(|e| format!("Invalid cron expression: {}", e))?
             }
             ScheduleExpression::Interval { seconds } => {
@@ -115,6 +116,12 @@ impl SchedulerManager {
                 let minute: u32 = parts[1]
                     .parse()
                     .map_err(|_| format!("Invalid minute: {}", parts[1]))?;
+                if hour > 23 {
+                    return Err(format!("Invalid hour: {} (must be 0-23)", hour));
+                }
+                if minute > 59 {
+                    return Err(format!("Invalid minute: {} (must be 0-59)", minute));
+                }
 
                 cron_expr_owned = format!("0 {} {} * * *", minute, hour);
                 Job::new_async_tz(cron_expr_owned.as_str(), Local, make_callback!())
@@ -138,5 +145,69 @@ impl SchedulerManager {
             .shutdown()
             .await
             .map_err(|e| format!("Failed to shutdown scheduler: {}", e))
+    }
+}
+
+fn normalize_cron_expression(expr: &str) -> Result<String, String> {
+    let field_count = expr.split_whitespace().count();
+    match field_count {
+        5 => Ok(format!("0 {}", expr)),
+        6 => Ok(expr.to_string()),
+        _ => Err(format!(
+            "Invalid cron expression: expected 5 or 6 fields, got {}. \
+             Use standard cron format (e.g. '0 9 * * 1-5' for weekdays at 9am)",
+            field_count
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_5field_cron_adds_seconds() {
+        assert_eq!(
+            normalize_cron_expression("0 9 * * 1-5").unwrap(),
+            "0 0 9 * * 1-5"
+        );
+        assert_eq!(
+            normalize_cron_expression("0 9 * * *").unwrap(),
+            "0 0 9 * * *"
+        );
+        assert_eq!(
+            normalize_cron_expression("30 8 * * MON-FRI").unwrap(),
+            "0 30 8 * * MON-FRI"
+        );
+    }
+
+    #[test]
+    fn normalize_6field_cron_is_unchanged() {
+        assert_eq!(
+            normalize_cron_expression("0 0 9 * * 1-5").unwrap(),
+            "0 0 9 * * 1-5"
+        );
+        assert_eq!(
+            normalize_cron_expression("0 0 9 * * *").unwrap(),
+            "0 0 9 * * *"
+        );
+    }
+
+    #[test]
+    fn normalize_invalid_field_count_returns_error() {
+        assert!(normalize_cron_expression("9 * *").is_err());
+        assert!(normalize_cron_expression("0 0 9 * * * *").is_err());
+    }
+
+    #[test]
+    fn normalize_weekday_cron_variations() {
+        assert_eq!(
+            normalize_cron_expression("0 9 * * MON-FRI").unwrap(),
+            "0 0 9 * * MON-FRI"
+        );
+        assert_eq!(
+            normalize_cron_expression("0 9 1,15 * *").unwrap(),
+            "0 0 9 1,15 * *"
+        );
     }
 }
