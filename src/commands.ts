@@ -26,6 +26,8 @@ export const uncToWslPath = (uncPath: string) => invoke<string>("unc_to_wsl_path
 export const hideWindow = () => invoke("hide_window");
 export const openClaudeInteractive = (prompt: string, workingDir: string | null) =>
   invoke("open_claude_interactive", { prompt, workingDir });
+export const resumeClaudeSession = (sessionId: string, workingDir: string | null) =>
+  invoke("resume_claude_session", { sessionId, workingDir });
 
 // --- Logs ---
 export const getLogs = (limit: number, offset: number) =>

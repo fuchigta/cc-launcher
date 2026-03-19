@@ -376,6 +376,20 @@ async fn open_claude_interactive(prompt: String, working_dir: Option<String>) ->
     .map_err(AppError::Execution)
 }
 
+#[tauri::command]
+async fn resume_claude_session(session_id: String, working_dir: Option<String>) -> AppResult<()> {
+    let config = AppConfig::load();
+    let resolved_terminal = terminal::TerminalDetector::resolve(&config.terminal);
+    terminal::resume_claude(
+        &resolved_terminal,
+        &session_id,
+        working_dir.as_deref(),
+        &config.wsl_shell,
+        config.wsl_directory.as_deref(),
+    )
+    .map_err(AppError::Execution)
+}
+
 fn update_directory_list(list: &mut Vec<String>, last: &mut Option<String>, directory: String) {
     list.retain(|d| d != &directory);
     list.insert(0, directory.clone());
@@ -795,6 +809,7 @@ pub fn run() {
             save_config,
             get_available_terminals,
             open_claude_interactive,
+            resume_claude_session,
             hide_window,
             update_recent_directory,
             update_wsl_directory,

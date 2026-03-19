@@ -1,4 +1,5 @@
 import type { ExecutionLog } from "../types";
+import { resumeClaudeSession } from "../commands";
 import { formatSource, formatDuration, statusBadgeClass } from "../utils";
 
 interface LogDetailProps {
@@ -13,6 +14,14 @@ function LogDetail({ log, onBack }: LogDetailProps) {
         <button className="btn btn-secondary btn-sm" onClick={onBack}>
           Back
         </button>
+        {log.sessionId && (
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => resumeClaudeSession(log.sessionId!, log.workingDir)}
+          >
+            Resume
+          </button>
+        )}
         <span className={statusBadgeClass(log.status)}>{log.status}</span>
       </div>
 

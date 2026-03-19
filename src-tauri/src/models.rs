@@ -38,6 +38,8 @@ pub enum ExecutionStatus {
 #[ts(rename_all = "camelCase")]
 pub struct ExecutionLog {
     pub id: String,
+    #[serde(default)]
+    pub session_id: Option<String>,
     pub source: ExecutionSource,
     pub prompt: String,
     pub working_dir: Option<String>,

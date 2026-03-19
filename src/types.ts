@@ -34,6 +34,7 @@ export type ExecutionStatus = "Running" | "Success" | "Failed";
 
 export interface ExecutionLog {
   id: string;
+  sessionId: string | null;
   source: ExecutionSource;
   prompt: string;
   workingDir: string | null;

@@ -82,11 +82,17 @@ pub async fn execute(
     app_handle: &tauri::AppHandle,
 ) -> AppResult<ExecutionLog> {
     let id = Uuid::new_v4().to_string();
+    let session_id = Uuid::new_v4().to_string();
     let started_at = Utc::now();
+
+    // --session-id をユーザー指定argsの前に追加
+    let mut effective_args = vec!["--session-id".to_string(), session_id.clone()];
+    effective_args.extend_from_slice(claude_args);
 
     // Running ログを書き込んで execution-started イベントを発火
     let running_log = ExecutionLog {
         id: id.clone(),
+        session_id: Some(session_id.clone()),
         source: source.clone(),
         prompt: prompt.to_string(),
         working_dir: working_dir.map(|s| s.to_string()),
@@ -107,7 +113,7 @@ pub async fn execute(
 
     let mut std_cmd = build_shell_command(
         prompt,
-        claude_args,
+        &effective_args,
         &resolved_terminal,
         &config.wsl_shell,
         working_dir,
@@ -165,6 +171,7 @@ pub async fn execute(
 
     let log = ExecutionLog {
         id,
+        session_id: Some(session_id),
         source,
         prompt: prompt.to_string(),
         working_dir: working_dir.map(|s| s.to_string()),

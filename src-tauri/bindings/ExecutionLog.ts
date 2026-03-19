@@ -2,4 +2,4 @@
 import type { ExecutionSource } from "./ExecutionSource";
 import type { ExecutionStatus } from "./ExecutionStatus";
 
-export type ExecutionLog = { id: string, source: ExecutionSource, prompt: string, workingDir: string | null, claudeArgs: Array<string>, status: ExecutionStatus, stdout: string, stderr: string, exitCode: number | null, startedAt: string, completedAt: string | null, durationMs: bigint | null, };
+export type ExecutionLog = { id: string, sessionId: string | null, source: ExecutionSource, prompt: string, workingDir: string | null, claudeArgs: Array<string>, status: ExecutionStatus, stdout: string, stderr: string, exitCode: number | null, startedAt: string, completedAt: string | null, durationMs: bigint | null, };

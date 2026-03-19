@@ -264,6 +264,92 @@ pub fn launch_claude(
     Ok(())
 }
 
+pub fn resume_claude(
+    terminal: &TerminalType,
+    session_id: &str,
+    working_dir: Option<&str>,
+    wsl_shell: &WslShell,
+    wsl_directory: Option<&str>,
+) -> Result<(), String> {
+    let resolved_terminal = if *terminal == TerminalType::Auto {
+        detect_wt_default_shell()
+    } else {
+        terminal.clone()
+    };
+
+    let mut cmd = Command::new("wt");
+    let mut args: Vec<String> = Vec::new();
+
+    match resolved_terminal {
+        TerminalType::Wsl => {
+            let wsl_path = wsl_directory
+                .map(|s| s.to_string())
+                .or_else(|| working_dir.and_then(windows_to_wsl_path));
+            let claude_cmd = format!("claude --resume '{}'", session_id);
+            let shell_name = match wsl_shell {
+                WslShell::Bash => "bash",
+                WslShell::Zsh => "zsh",
+                WslShell::Sh => "sh",
+            };
+
+            args.push("wsl".to_string());
+            if let Some(wsl_dir) = wsl_path {
+                args.extend(["--cd".to_string(), wsl_dir]);
+            }
+            args.extend([
+                "--".to_string(),
+                shell_name.to_string(),
+                "-l".to_string(),
+                "-i".to_string(),
+                "-c".to_string(),
+                claude_cmd,
+            ]);
+        }
+        TerminalType::Pwsh | TerminalType::PowerShell | TerminalType::Auto => {
+            let shell = if resolved_terminal == TerminalType::PowerShell {
+                "powershell"
+            } else {
+                "pwsh"
+            };
+            let claude_cmd = format!("claude --resume '{}'", session_id);
+            let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
+                crate::windows_util::default_working_dir()
+                    .and_then(|p| p.to_str().map(|s| s.to_string()))
+            });
+            if let Some(dir) = effective_dir {
+                args.extend(["-d".to_string(), dir]);
+            }
+            args.extend([
+                "--".to_string(),
+                shell.to_string(),
+                "-NoExit".to_string(),
+                "-Command".to_string(),
+                claude_cmd,
+            ]);
+        }
+        TerminalType::Cmd => {
+            let claude_cmd = format!("claude --resume \"{}\"", session_id);
+            let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
+                crate::windows_util::default_working_dir()
+                    .and_then(|p| p.to_str().map(|s| s.to_string()))
+            });
+            if let Some(dir) = effective_dir {
+                args.extend(["-d".to_string(), dir]);
+            }
+            args.extend([
+                "--".to_string(),
+                "cmd".to_string(),
+                "/k".to_string(),
+                claude_cmd,
+            ]);
+        }
+    }
+
+    cmd.args(&args);
+    cmd.spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
