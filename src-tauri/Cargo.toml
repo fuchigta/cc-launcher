@@ -3,7 +3,7 @@ members = [".", "plugins/folder-watcher", "plugins/imap-watcher"]
 
 [package]
 name = "cc-launcher"
-version = "0.17.15"
+version = "0.17.16"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
