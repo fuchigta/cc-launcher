@@ -293,6 +293,12 @@
   margin-bottom: 16px;
 }
 
+.log-detail-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .log-section-title {
   margin-bottom: 8px;
 }

@@ -14,15 +14,17 @@ function LogDetail({ log, onBack }: LogDetailProps) {
         <button className="btn btn-secondary btn-sm" onClick={onBack}>
           Back
         </button>
-        {log.sessionId && (
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => resumeClaudeSession(log.sessionId!, log.workingDir)}
-          >
-            Resume
-          </button>
-        )}
-        <span className={statusBadgeClass(log.status)}>{log.status}</span>
+        <div className="log-detail-header-right">
+          <span className={statusBadgeClass(log.status)}>{log.status}</span>
+          {log.sessionId && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => resumeClaudeSession(log.sessionId!, log.workingDir)}
+            >
+              Resume
+            </button>
+          )}
+        </div>
       </div>
 
       <dl className="log-meta">
