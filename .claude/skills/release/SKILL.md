@@ -115,17 +115,16 @@ pnpm tag
 
 ### Step 7: CI + Release ワークフローを個別に監視
 
-タグ push により GitHub Actions の CI ワークフロー（`ci.yml`）と Release ワークフロー（`release.yml`）が起動する。両方を個別に監視する。
+タグ push により GitHub Actions の CI ワークフロー（`ci.yml`）と Release ワークフロー（`release.yml`）が起動する。**トークン消費を最小化するため、監視スクリプトを1回のツール呼び出しで実行する。**
 
 ```bash
-# CI ワークフロー
-gh run list --repo fuchigta/cc-launcher --workflow=ci.yml --limit=1
-
-# Release ワークフロー
-gh run list --repo fuchigta/cc-launcher --workflow=release.yml --limit=1
+# timeout: 600000 を指定すること（Bash ツールの上限 = 10分）
+bash "<SKILL_BASE_DIR>/scripts/wait-workflows.sh"
 ```
 
-ポーリング間隔: 30秒。どちらかが `in_progress` / `queued` の間は継続する。
+- 終了コード `0`: 両方成功 → Step 8 へ
+- 終了コード `1`: タイムアウト（まだ実行中）→ 同じコマンドを再実行
+- 終了コード `2`: 失敗検出 → Step 8 へ
 
 ### Step 8: 結果判定
 
