@@ -1,7 +1,15 @@
 ---
 name: release
-description: This skill should be used when the user asks to "リリースしてください", "タグ打ってプッシュ", "バージョンを上げてリリース", "release", "bump version and push", or wants to publish a new version of cc-launcher. Guides through the full release workflow: commit pending changes, bump version, commit the bump, create a git tag, and push.
-version: 0.1.0
+description: >-
+  This skill should be used when the user asks to "リリースしてください",
+  "タグ打ってプッシュ", "バージョンを上げてリリース", "release",
+  "bump version and push", "CIを監視して", "CI確認して",
+  "リリース結果を確認", "watch CI", "monitor CI",
+  or wants to publish a new version of cc-launcher.
+  Guides through the full release workflow: commit pending changes,
+  bump version, commit the bump, create a git tag, push,
+  then monitor CI/Release workflows and fix failures if needed.
+version: 0.2.0
 ---
 
 # cc-launcher リリース手順
@@ -14,12 +22,16 @@ cc-launcher のリリースは以下の順序で行う:
 2. `pnpm bump <version>` でバージョン一括更新
 3. バージョン更新をコミット
 4. `pnpm tag` でタグ作成 & push
+5. GitHub Actions の `Release` ワークフロー完了を確認
+6. 失敗時: 分析・修正・再リリース
+7. 成功確認 & リリースURL報告
 
 ## 重要な制約
 
 - **git-cliff の制約**: `pnpm bump` 実行時に未コミットの変更があると CHANGELOG.md に反映されない。実装変更は必ず先にコミットすること。
 - **バージョン形式**: semver（例: `0.17.16`, `1.0.0`）
 - **バージョン更新コミットメッセージ**: `chore: バージョンを<version>に更新`（このプロジェクトの慣例）
+- **CI監視の制約**: 修正→再リリースは最大2回まで。インフラ起因の失敗は `gh run rerun --failed` で再実行（回数制限なし）。
 
 ## 手順
 
@@ -100,3 +112,58 @@ pnpm tag
 ```
 
 `v<version>` タグが作成され、`main` ブランチとタグが origin へ push される。
+
+### Step 7: CI + Release ワークフローを個別に監視
+
+タグ push により GitHub Actions の CI ワークフロー（`ci.yml`）と Release ワークフロー（`release.yml`）が起動する。両方を個別に監視する。
+
+```bash
+# CI ワークフロー
+gh run list --repo fuchigta/cc-launcher --workflow=ci.yml --limit=1
+
+# Release ワークフロー
+gh run list --repo fuchigta/cc-launcher --workflow=release.yml --limit=1
+```
+
+ポーリング間隔: 30秒。どちらかが `in_progress` / `queued` の間は継続する。
+
+### Step 8: 結果判定
+
+両ワークフローが完了したら結果を確認する:
+
+```bash
+gh run view <run-id> --log-failed
+```
+
+| 状態 | 起因 | 対応 |
+|---|---|---|
+| 両方 `success` | — | Step 10（完了報告）へ |
+| `failure` でログにネットワーク/タイムアウト/rate-limit | インフラ起因 | `gh run rerun --failed <run-id>` で再実行（Step 7 へ戻る） |
+| `failure` でログにコンパイルエラー/テスト失敗/設定ミス | コード起因 | Step 9（修正 & 再リリース）へ |
+
+### Step 9: 修正 & 再リリース（最大2回）
+
+コード起因の失敗の場合、修正してパッチバージョンで再リリースする。
+
+1. 原因を特定・修正
+2. 修正をコミット（`fix: ...`）
+3. Step 3 に戻り次バージョン（パッチ +1）を決定
+4. Step 4〜7 を実行
+
+リトライ回数を記録し、2回目の失敗後は Step 10b へ進む。
+
+### Step 10a: 成功確認 & リリースURL報告
+
+```bash
+gh release view --repo fuchigta/cc-launcher v<version>
+```
+
+GitHub Release が作成されていることを確認し、リリース URL をユーザーに報告して完了。
+
+### Step 10b: リトライ上限到達
+
+修正 & 再リリースを2回試みても失敗した場合、以下をユーザーに報告して終了する:
+
+- 失敗したワークフローの Run ID とログ URL
+- 失敗の概要（エラーメッセージ抜粋）
+- 推奨アクション（手動調査 or 追加コンテキストの提供依頼）
