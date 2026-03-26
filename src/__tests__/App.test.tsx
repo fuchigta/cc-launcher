@@ -129,6 +129,58 @@ describe("App", () => {
     expect(screen.queryByText("Browse...")).not.toBeInTheDocument();
   });
 
+  it("Shift+Enterで改行が入力され、送信されない", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() => {
+      expect(commandMocks.getConfig).toHaveBeenCalled();
+    });
+
+    commandMocks.openClaudeInteractive.mockClear();
+
+    const textarea = screen.getByPlaceholderText("Ask Claude...");
+    await user.type(textarea, "line1");
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    await user.type(textarea, "line2");
+
+    expect(commandMocks.openClaudeInteractive).not.toHaveBeenCalled();
+    expect(textarea).toHaveValue("line1\nline2");
+  });
+
+  it("送信中にEnterを連打しても二重送信されない", async () => {
+    const user = userEvent.setup();
+
+    let resolveSubmit: () => void;
+    commandMocks.openClaudeInteractive.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(commandMocks.getConfig).toHaveBeenCalled();
+    });
+
+    const textarea = screen.getByPlaceholderText("Ask Claude...");
+    await user.type(textarea, "hello");
+
+    // 1回目のEnter（送信開始・openClaudeInteractiveが未解決のまま）
+    await user.keyboard("{Enter}");
+    // 2回目のEnter（送信中のため無視されるべき）
+    await user.keyboard("{Enter}");
+
+    // 1回目の送信を完了させる
+    resolveSubmit!();
+
+    await waitFor(() => {
+      expect(commandMocks.openClaudeInteractive).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("recentDirectories選択でcurrentDirectoryが更新される", async () => {
     const user = userEvent.setup();
 

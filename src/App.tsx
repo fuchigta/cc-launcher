@@ -21,7 +21,8 @@ function App() {
   const [wslRecentDirectories, setWslRecentDirectories] = useState<string[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const isSubmittingRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,10 +80,12 @@ function App() {
     };
   }, [dropdownOpen]);
 
-  // Resize window when dropdown opens/closes
+  // Resize window when dropdown opens/closes or textarea grows
   useEffect(() => {
     const currentWindow = getCurrentWindow();
-    const baseHeight = 120;
+    // 61 = non-textarea overhead (container padding + directory-row margin + directory-row height)
+    const textareaHeight = inputRef.current?.offsetHeight ?? 59;
+    const baseHeight = textareaHeight + 61;
     const bottomPadding = 12;
     // Calculate dropdown height: items (40px each) + browse (40px) + divider (9px) + margin (4px)
     const dirList = isWsl ? wslRecentDirectories : recentDirectories;
@@ -95,11 +98,13 @@ function App() {
     } else {
       currentWindow.setSize(new LogicalSize(600, baseHeight));
     }
-  }, [dropdownOpen, recentDirectories.length, wslRecentDirectories.length, isWsl]);
+  }, [dropdownOpen, recentDirectories.length, wslRecentDirectories.length, isWsl, prompt]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     if (prompt.trim()) {
+      isSubmittingRef.current = true;
       try {
         setError(null);
         if (isWsl) {
@@ -118,6 +123,8 @@ function App() {
       } catch (err) {
         console.error("Failed to launch Claude:", err);
         setError(String(err));
+      } finally {
+        isSubmittingRef.current = false;
       }
     }
   };
@@ -128,8 +135,13 @@ function App() {
         compositionJustEndedRef.current = false;
         return;
       }
+      if (e.shiftKey) {
+        return; // Shift+Enter: allow default newline insertion
+      }
       e.preventDefault();
-      formRef.current?.requestSubmit();
+      if (!isSubmittingRef.current) {
+        formRef.current?.requestSubmit();
+      }
     } else if (e.key === "Escape") {
       if (dropdownOpen) {
         setDropdownOpen(false);
@@ -253,9 +265,8 @@ function App() {
   return (
     <div className="overlay-container" ref={containerRef}>
       <form ref={formRef} onSubmit={handleSubmit} className="input-form" onBlur={handleBlur}>
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onCompositionEnd={() => {
@@ -265,6 +276,7 @@ function App() {
           placeholder="Ask Claude..."
           className="prompt-input"
           autoFocus
+          rows={1}
         />
         {error && <div className="error-message">{error}</div>}
         <div className="directory-row" ref={dropdownRef}>
