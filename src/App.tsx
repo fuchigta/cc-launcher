@@ -96,7 +96,7 @@ function App() {
     if (dropdownOpen) {
       currentWindow.setSize(new LogicalSize(600, expandedHeight));
     } else {
-      currentWindow.setSize(new LogicalSize(600, baseHeight));
+      currentWindow.setSize(new LogicalSize(600, baseHeight + bottomPadding));
     }
   }, [dropdownOpen, recentDirectories.length, wslRecentDirectories.length, isWsl, prompt]);
 
