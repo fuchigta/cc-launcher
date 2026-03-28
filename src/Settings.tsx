@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
 import type { AppConfig, TerminalInfo, TerminalType, WslShell } from "./types";
 import { getConfig, saveConfig, getAvailableTerminals } from "./commands";
 
@@ -13,10 +14,12 @@ function Settings() {
   const [enableOnStartup, setEnableOnStartup] = useState(true);
   const [status, setStatus] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
 
   useEffect(() => {
     loadConfig();
     loadTerminals();
+    getVersion().then(setAppVersion).catch(console.error);
   }, []);
 
   const loadConfig = async () => {
@@ -198,6 +201,7 @@ function Settings() {
           Close
         </button>
       </div>
+      {appVersion && <div className="version-info">v{appVersion}</div>}
     </div>
   );
 }

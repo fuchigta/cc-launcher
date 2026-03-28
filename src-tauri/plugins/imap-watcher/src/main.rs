@@ -254,7 +254,7 @@ fn fetch_and_process_new_mails(
         .join(",");
 
     let fetches = session
-        .uid_fetch(&uid_list, "BODY[]")
+        .uid_fetch(&uid_list, "BODY.PEEK[]")
         .map_err(|e| format!("Fetch error: {}", e))?;
 
     for fetch in fetches.iter() {

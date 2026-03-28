@@ -578,9 +578,27 @@ fn parse_shortcut(shortcut_str: &str) -> Option<Shortcut> {
     key_code.map(|code| Shortcut::new(Some(modifiers), code))
 }
 
+fn center_on_cursor_monitor<R: Runtime>(window: &tauri::WebviewWindow<R>) {
+    if let Some((mon_x, mon_y, mon_w, mon_h)) = windows_util::get_cursor_monitor_work_area() {
+        if let Ok(size) = window.outer_size() {
+            let win_w = size.width as i32;
+            let win_h = size.height as i32;
+            let x = mon_x + (mon_w - win_w) / 2;
+            let y = mon_y + (mon_h - win_h) / 2;
+            let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+            return;
+        }
+    }
+    let _ = window.center();
+}
+
 fn show_window<R: Runtime>(app: &tauri::AppHandle<R>, label: &str) {
     if let Some(window) = app.get_webview_window(label) {
-        let _ = window.center();
+        if label == "main" {
+            center_on_cursor_monitor(&window);
+        } else {
+            let _ = window.center();
+        }
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -591,7 +609,7 @@ fn toggle_main_window<R: Runtime>(app: &tauri::AppHandle<R>) {
         if window.is_visible().unwrap_or(false) {
             let _ = window.hide();
         } else {
-            let _ = window.center();
+            center_on_cursor_monitor(&window);
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -637,6 +655,7 @@ pub fn run() {
             // Build tray icon
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("cc-launcher")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {

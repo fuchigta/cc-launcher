@@ -40,6 +40,11 @@ ts-rs = { version = "10", features = ["chrono-impl", "serde-json-impl"] }
 clap = { version = "4", features = ["derive"] }
 notify = "8"
 winreg = "0.55"
+windows = { version = "0.61", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_Foundation",
+] }
 
 [[bin]]
 name = "cc-launcher-cli"
