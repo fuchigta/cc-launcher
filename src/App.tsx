@@ -135,8 +135,8 @@ function App() {
         compositionJustEndedRef.current = false;
         return;
       }
-      if (e.shiftKey) {
-        return; // Shift+Enter: allow default newline insertion
+      if (e.ctrlKey) {
+        return; // Ctrl+Enter: allow default newline insertion
       }
       e.preventDefault();
       if (!isSubmittingRef.current) {

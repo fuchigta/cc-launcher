@@ -149,6 +149,22 @@ impl TerminalDetector {
     }
 }
 
+fn cursor_monitor_pos_args() -> Vec<String> {
+    if let Some((mon_x, mon_y, _mon_w, _mon_h)) =
+        crate::windows_util::get_cursor_monitor_work_area()
+    {
+        let x = mon_x + 50;
+        let y = mon_y + 50;
+        vec!["--pos".to_string(), format!("{},{}", x, y)]
+    } else {
+        vec![]
+    }
+}
+
+pub(crate) fn normalize_prompt(prompt: &str) -> String {
+    prompt.replace("\r\n", " ").replace(['\r', '\n'], " ")
+}
+
 pub(crate) fn escape_cmd_meta(s: &str) -> String {
     let mut result = String::with_capacity(s.len() * 2);
     for c in s.chars() {
@@ -180,6 +196,8 @@ pub fn launch_claude(
     wsl_shell: &WslShell,
     wsl_directory: Option<&str>,
 ) -> Result<(), String> {
+    let prompt = normalize_prompt(prompt);
+
     let resolved_terminal = if *terminal == TerminalType::Auto {
         detect_wt_default_shell()
     } else {
@@ -187,7 +205,7 @@ pub fn launch_claude(
     };
 
     let mut cmd = Command::new("wt");
-    let mut args: Vec<String> = Vec::new();
+    let mut args: Vec<String> = cursor_monitor_pos_args();
 
     match resolved_terminal {
         TerminalType::Wsl => {
@@ -241,7 +259,7 @@ pub fn launch_claude(
             ]);
         }
         TerminalType::Cmd => {
-            let escaped = escape_cmd_meta(prompt);
+            let escaped = escape_cmd_meta(&prompt);
             let claude_cmd = format!("claude \"{}\"", escaped);
             let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
                 crate::windows_util::default_working_dir()
@@ -278,7 +296,7 @@ pub fn resume_claude(
     };
 
     let mut cmd = Command::new("wt");
-    let mut args: Vec<String> = Vec::new();
+    let mut args: Vec<String> = cursor_monitor_pos_args();
 
     match resolved_terminal {
         TerminalType::Wsl => {
@@ -370,5 +388,30 @@ mod tests {
         assert_eq!(escape_cmd_meta("a > b < c"), "a ^> b ^< c");
         assert_eq!(escape_cmd_meta("a ^ b"), "a ^^ b");
         assert_eq!(escape_cmd_meta("(a)"), "^(a^)");
+    }
+
+    #[test]
+    fn normalize_prompt_preserves_plain_text() {
+        assert_eq!(normalize_prompt("hello world"), "hello world");
+    }
+
+    #[test]
+    fn normalize_prompt_replaces_lf() {
+        assert_eq!(normalize_prompt("line1\nline2"), "line1 line2");
+    }
+
+    #[test]
+    fn normalize_prompt_replaces_crlf() {
+        assert_eq!(normalize_prompt("line1\r\nline2"), "line1 line2");
+    }
+
+    #[test]
+    fn normalize_prompt_replaces_cr() {
+        assert_eq!(normalize_prompt("line1\rline2"), "line1 line2");
+    }
+
+    #[test]
+    fn normalize_prompt_replaces_mixed_newlines() {
+        assert_eq!(normalize_prompt("a\r\nb\nc\rd"), "a b c d");
     }
 }

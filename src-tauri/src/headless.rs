@@ -7,6 +7,7 @@ use tauri::Emitter;
 use uuid::Uuid;
 
 fn shell_command_str(prompt: &str, claude_args: &[String], terminal: &TerminalType) -> String {
+    let prompt = crate::terminal::normalize_prompt(prompt);
     let args_str = claude_args.join(" ");
     match terminal {
         TerminalType::Wsl => {
@@ -18,7 +19,7 @@ fn shell_command_str(prompt: &str, claude_args: &[String], terminal: &TerminalTy
             }
         }
         TerminalType::Cmd => {
-            let escaped = crate::terminal::escape_cmd_meta(prompt);
+            let escaped = crate::terminal::escape_cmd_meta(&prompt);
             if args_str.is_empty() {
                 format!("claude --print \"{}\"", escaped)
             } else {
@@ -277,6 +278,24 @@ mod tests {
     fn shell_command_str_pwsh_no_args() {
         let cmd = shell_command_str("hello", &[], &TerminalType::Pwsh);
         assert_eq!(cmd, "claude --print 'hello'");
+    }
+
+    #[test]
+    fn shell_command_str_wsl_multiline_prompt() {
+        let cmd = shell_command_str("line1\nline2", &[], &TerminalType::Wsl);
+        assert_eq!(cmd, "claude --print 'line1 line2'");
+    }
+
+    #[test]
+    fn shell_command_str_cmd_multiline_prompt() {
+        let cmd = shell_command_str("line1\r\nline2", &[], &TerminalType::Cmd);
+        assert_eq!(cmd, "claude --print \"line1 line2\"");
+    }
+
+    #[test]
+    fn shell_command_str_powershell_multiline_prompt() {
+        let cmd = shell_command_str("line1\nline2", &[], &TerminalType::PowerShell);
+        assert_eq!(cmd, "claude --print 'line1 line2'");
     }
 
     #[test]
