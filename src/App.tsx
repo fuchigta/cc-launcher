@@ -28,6 +28,7 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDialogOpenRef = useRef(false);
   const compositionJustEndedRef = useRef(false);
+  const cursorPosRef = useRef<number | null>(null);
 
   const isWsl = terminal === "Wsl";
 
@@ -63,6 +64,13 @@ function App() {
       unlistenFocus.then((unlisten) => unlisten());
     };
   }, []);
+
+  useEffect(() => {
+    if (cursorPosRef.current !== null && inputRef.current) {
+      inputRef.current.setSelectionRange(cursorPosRef.current, cursorPosRef.current);
+      cursorPosRef.current = null;
+    }
+  }, [prompt]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -136,7 +144,13 @@ function App() {
         return;
       }
       if (e.ctrlKey) {
-        return; // Ctrl+Enter: allow default newline insertion
+        e.preventDefault();
+        const target = e.target as HTMLTextAreaElement;
+        const start = target.selectionStart ?? prompt.length;
+        const end = target.selectionEnd ?? prompt.length;
+        setPrompt(prompt.slice(0, start) + "\n" + prompt.slice(end));
+        cursorPosRef.current = start + 1;
+        return;
       }
       e.preventDefault();
       if (!isSubmittingRef.current) {

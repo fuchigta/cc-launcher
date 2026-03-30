@@ -129,7 +129,7 @@ describe("App", () => {
     expect(screen.queryByText("Browse...")).not.toBeInTheDocument();
   });
 
-  it("Shift+Enterで改行が入力され、送信されない", async () => {
+  it("Ctrl+Enterで改行が入力され、送信されない", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -141,7 +141,7 @@ describe("App", () => {
 
     const textarea = screen.getByPlaceholderText("Ask Claude...");
     await user.type(textarea, "line1");
-    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    await user.keyboard("{Control>}{Enter}{/Control}");
     await user.type(textarea, "line2");
 
     expect(commandMocks.openClaudeInteractive).not.toHaveBeenCalled();
