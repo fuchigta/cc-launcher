@@ -97,11 +97,11 @@ function Settings() {
   };
 
   const getBestTerminalLabel = (): string => {
-    const available = terminals.filter((t) => t.available && t.terminal_type !== "Cmd");
+    const available = terminals.filter((t) => t.available);
     if (available.length > 0) {
       return `Auto (${available[0].display_name})`;
     }
-    return "Auto (Command Prompt)";
+    return "Auto";
   };
 
   if (!config) {

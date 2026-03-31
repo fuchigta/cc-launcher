@@ -38,6 +38,7 @@ tokio-cron-scheduler = "0.13"
 thiserror = "2"
 ts-rs = { version = "10", features = ["chrono-impl", "serde-json-impl"] }
 clap = { version = "4", features = ["derive"] }
+base64 = "0.22"
 notify = "8"
 winreg = "0.55"
 windows = { version = "0.61", features = [

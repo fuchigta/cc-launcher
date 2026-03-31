@@ -29,7 +29,6 @@ const defaultConfig: AppConfig = {
 const defaultTerminals: TerminalInfo[] = [
   { terminal_type: "Pwsh", display_name: "PowerShell 7", available: true },
   { terminal_type: "PowerShell", display_name: "Windows PowerShell", available: true },
-  { terminal_type: "Cmd", display_name: "Command Prompt", available: true },
   { terminal_type: "Wsl", display_name: "WSL", available: false },
 ];
 

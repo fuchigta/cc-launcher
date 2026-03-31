@@ -139,7 +139,7 @@ enum ConfigKey {
     Shortcut { value: String },
     /// Set execution timeout in seconds
     Timeout { secs: u64 },
-    /// Set terminal type: Auto, Pwsh, PowerShell, Cmd, Wsl
+    /// Set terminal type: Auto, Pwsh, PowerShell, Wsl
     Terminal { value: String },
 }
 
@@ -578,12 +578,10 @@ fn parse_terminal_type(s: &str) -> Result<TerminalType, Box<dyn std::error::Erro
         "auto" => Ok(TerminalType::Auto),
         "pwsh" => Ok(TerminalType::Pwsh),
         "powershell" => Ok(TerminalType::PowerShell),
-        "cmd" => Ok(TerminalType::Cmd),
         "wsl" => Ok(TerminalType::Wsl),
-        _ => Err(format!(
-            "Unknown terminal type: {s}. Valid values: Auto, Pwsh, PowerShell, Cmd, Wsl"
-        )
-        .into()),
+        _ => Err(
+            format!("Unknown terminal type: {s}. Valid values: Auto, Pwsh, PowerShell, Wsl").into(),
+        ),
     }
 }
 

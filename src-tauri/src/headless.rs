@@ -6,34 +6,39 @@ use chrono::Utc;
 use tauri::Emitter;
 use uuid::Uuid;
 
-fn shell_command_str(prompt: &str, claude_args: &[String], terminal: &TerminalType) -> String {
-    let prompt = crate::terminal::normalize_prompt(prompt);
+enum ShellCommand {
+    /// 通常のコマンド文字列（-Command / -c に渡す）
+    Plain(String),
+    /// PowerShell -EncodedCommand 用の Base64 エンコード済み文字列
+    Encoded(String),
+}
+
+fn shell_command_str(
+    prompt: &str,
+    claude_args: &[String],
+    terminal: &TerminalType,
+) -> ShellCommand {
+    let prompt = crate::terminal::normalize_line_endings(prompt);
     let args_str = claude_args.join(" ");
     match terminal {
         TerminalType::Wsl => {
-            let escaped = prompt.replace("'", "'\\''");
-            if args_str.is_empty() {
-                format!("claude --print '{}'", escaped)
+            let escaped = crate::terminal::escape_bash_dollar_quote(&prompt);
+            let cmd = if args_str.is_empty() {
+                format!("claude --print $'{}'", escaped)
             } else {
-                format!("claude --print '{}' {}", escaped, args_str)
-            }
-        }
-        TerminalType::Cmd => {
-            let escaped = crate::terminal::escape_cmd_meta(&prompt);
-            if args_str.is_empty() {
-                format!("claude --print \"{}\"", escaped)
-            } else {
-                format!("claude --print \"{}\" {}", escaped, args_str)
-            }
+                format!("claude --print $'{}' {}", escaped, args_str)
+            };
+            ShellCommand::Plain(cmd)
         }
         _ => {
             // PowerShell / Pwsh
             let escaped = prompt.replace("'", "''");
-            if args_str.is_empty() {
+            let ps_cmd = if args_str.is_empty() {
                 format!("claude --print '{}'", escaped)
             } else {
                 format!("claude --print '{}' {}", escaped, args_str)
-            }
+            };
+            ShellCommand::Encoded(crate::terminal::encode_powershell_command(&ps_cmd))
         }
     }
 }
@@ -45,7 +50,7 @@ fn build_shell_command(
     wsl_shell: &WslShell,
     working_dir: Option<&str>,
 ) -> std::process::Command {
-    let claude_cmd = shell_command_str(prompt, claude_args, terminal);
+    let shell_cmd = shell_command_str(prompt, claude_args, terminal);
     match terminal {
         TerminalType::Wsl => {
             let shell_name = crate::terminal::wsl_shell_name(wsl_shell);
@@ -53,12 +58,10 @@ fn build_shell_command(
             if let Some(dir) = working_dir {
                 cmd.args(["--cd", dir]);
             }
+            let ShellCommand::Plain(claude_cmd) = shell_cmd else {
+                unreachable!("WSL always returns Plain")
+            };
             cmd.args(["--", shell_name, "-l", "-i", "-c", &claude_cmd]);
-            cmd
-        }
-        TerminalType::Cmd => {
-            let mut cmd = crate::windows_util::no_window_command("cmd");
-            cmd.args(["/c", &claude_cmd]);
             cmd
         }
         _ => {
@@ -69,7 +72,10 @@ fn build_shell_command(
                 "pwsh"
             };
             let mut cmd = crate::windows_util::no_window_command(shell);
-            cmd.args(["-Command", &claude_cmd]);
+            let ShellCommand::Encoded(encoded) = shell_cmd else {
+                unreachable!("PowerShell always returns Encoded")
+            };
+            cmd.args(["-EncodedCommand", &encoded]);
             cmd
         }
     }
@@ -228,74 +234,111 @@ mod tests {
     use super::*;
     use crate::config::TerminalType;
 
+    fn decode_powershell_encoded(encoded: &str) -> String {
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap();
+        let utf16: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        String::from_utf16(&utf16).unwrap()
+    }
+
     #[test]
     fn shell_command_str_wsl_no_args() {
-        let cmd = shell_command_str("hello world", &[], &TerminalType::Wsl);
-        assert_eq!(cmd, "claude --print 'hello world'");
+        let ShellCommand::Plain(cmd) = shell_command_str("hello world", &[], &TerminalType::Wsl)
+        else {
+            panic!("expected Plain");
+        };
+        assert_eq!(cmd, "claude --print $'hello world'");
     }
 
     #[test]
     fn shell_command_str_wsl_with_args() {
-        let cmd = shell_command_str(
+        let ShellCommand::Plain(cmd) = shell_command_str(
             "hello",
             &["--dangerously-skip-permissions".to_string()],
             &TerminalType::Wsl,
+        ) else {
+            panic!("expected Plain");
+        };
+        assert_eq!(
+            cmd,
+            "claude --print $'hello' --dangerously-skip-permissions"
         );
-        assert_eq!(cmd, "claude --print 'hello' --dangerously-skip-permissions");
     }
 
     #[test]
     fn shell_command_str_wsl_escapes_single_quote() {
-        let cmd = shell_command_str("it's a test", &[], &TerminalType::Wsl);
-        assert_eq!(cmd, "claude --print 'it'\\''s a test'");
-    }
-
-    #[test]
-    fn shell_command_str_cmd_no_args() {
-        let cmd = shell_command_str("hello", &[], &TerminalType::Cmd);
-        assert_eq!(cmd, "claude --print \"hello\"");
-    }
-
-    #[test]
-    fn shell_command_str_cmd_escapes_meta() {
-        let cmd = shell_command_str("a & b", &[], &TerminalType::Cmd);
-        assert_eq!(cmd, "claude --print \"a ^& b\"");
-    }
-
-    #[test]
-    fn shell_command_str_powershell_no_args() {
-        let cmd = shell_command_str("hello", &[], &TerminalType::PowerShell);
-        assert_eq!(cmd, "claude --print 'hello'");
-    }
-
-    #[test]
-    fn shell_command_str_powershell_escapes_single_quote() {
-        let cmd = shell_command_str("it's a test", &[], &TerminalType::PowerShell);
-        assert_eq!(cmd, "claude --print 'it''s a test'");
-    }
-
-    #[test]
-    fn shell_command_str_pwsh_no_args() {
-        let cmd = shell_command_str("hello", &[], &TerminalType::Pwsh);
-        assert_eq!(cmd, "claude --print 'hello'");
+        let ShellCommand::Plain(cmd) = shell_command_str("it's a test", &[], &TerminalType::Wsl)
+        else {
+            panic!("expected Plain");
+        };
+        assert_eq!(cmd, "claude --print $'it\\'s a test'");
     }
 
     #[test]
     fn shell_command_str_wsl_multiline_prompt() {
-        let cmd = shell_command_str("line1\nline2", &[], &TerminalType::Wsl);
-        assert_eq!(cmd, "claude --print 'line1 line2'");
+        let ShellCommand::Plain(cmd) = shell_command_str("line1\nline2", &[], &TerminalType::Wsl)
+        else {
+            panic!("expected Plain");
+        };
+        assert_eq!(cmd, "claude --print $'line1\\nline2'");
     }
 
     #[test]
-    fn shell_command_str_cmd_multiline_prompt() {
-        let cmd = shell_command_str("line1\r\nline2", &[], &TerminalType::Cmd);
-        assert_eq!(cmd, "claude --print \"line1 line2\"");
+    fn shell_command_str_wsl_crlf_prompt() {
+        let ShellCommand::Plain(cmd) = shell_command_str("line1\r\nline2", &[], &TerminalType::Wsl)
+        else {
+            panic!("expected Plain");
+        };
+        assert_eq!(cmd, "claude --print $'line1\\nline2'");
+    }
+
+    #[test]
+    fn shell_command_str_powershell_no_args() {
+        let ShellCommand::Encoded(enc) = shell_command_str("hello", &[], &TerminalType::PowerShell)
+        else {
+            panic!("expected Encoded");
+        };
+        assert_eq!(decode_powershell_encoded(&enc), "claude --print 'hello'");
+    }
+
+    #[test]
+    fn shell_command_str_powershell_escapes_single_quote() {
+        let ShellCommand::Encoded(enc) =
+            shell_command_str("it's a test", &[], &TerminalType::PowerShell)
+        else {
+            panic!("expected Encoded");
+        };
+        assert_eq!(
+            decode_powershell_encoded(&enc),
+            "claude --print 'it''s a test'"
+        );
+    }
+
+    #[test]
+    fn shell_command_str_pwsh_no_args() {
+        let ShellCommand::Encoded(enc) = shell_command_str("hello", &[], &TerminalType::Pwsh)
+        else {
+            panic!("expected Encoded");
+        };
+        assert_eq!(decode_powershell_encoded(&enc), "claude --print 'hello'");
     }
 
     #[test]
     fn shell_command_str_powershell_multiline_prompt() {
-        let cmd = shell_command_str("line1\nline2", &[], &TerminalType::PowerShell);
-        assert_eq!(cmd, "claude --print 'line1 line2'");
+        let ShellCommand::Encoded(enc) =
+            shell_command_str("line1\nline2", &[], &TerminalType::PowerShell)
+        else {
+            panic!("expected Encoded");
+        };
+        assert_eq!(
+            decode_powershell_encoded(&enc),
+            "claude --print 'line1\nline2'"
+        );
     }
 
     #[test]

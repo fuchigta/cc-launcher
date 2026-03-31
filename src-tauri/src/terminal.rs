@@ -68,10 +68,8 @@ fn detect_wt_default_shell() -> TerminalType {
                     return TerminalType::Wsl;
                 } else if lower.contains("pwsh") {
                     return TerminalType::Pwsh;
-                } else if lower.contains("powershell") {
+                } else if lower.contains("powershell") || lower.contains("cmd") {
                     return TerminalType::PowerShell;
-                } else if lower.contains("cmd") {
-                    return TerminalType::Cmd;
                 }
             }
         }
@@ -119,11 +117,6 @@ impl TerminalDetector {
                 ),
             },
             TerminalInfo {
-                terminal_type: TerminalType::Cmd,
-                display_name: "Command Prompt (cmd)".to_string(),
-                available: true,
-            },
-            TerminalInfo {
                 terminal_type: TerminalType::Wsl,
                 display_name: "WSL".to_string(),
                 available: command_available("wsl", &["--status"]),
@@ -134,11 +127,11 @@ impl TerminalDetector {
     pub fn get_best() -> TerminalType {
         let terminals = Self::detect_available();
         for t in terminals {
-            if t.available && t.terminal_type != TerminalType::Cmd {
+            if t.available {
                 return t.terminal_type;
             }
         }
-        TerminalType::Cmd
+        TerminalType::PowerShell
     }
 
     pub fn resolve(config_terminal: &TerminalType) -> TerminalType {
@@ -161,20 +154,26 @@ fn cursor_monitor_pos_args() -> Vec<String> {
     }
 }
 
-pub(crate) fn normalize_prompt(prompt: &str) -> String {
-    prompt.replace("\r\n", " ").replace(['\r', '\n'], " ")
+pub(crate) fn normalize_line_endings(prompt: &str) -> String {
+    prompt.replace("\r\n", "\n").replace('\r', "\n")
 }
 
-pub(crate) fn escape_cmd_meta(s: &str) -> String {
+/// PowerShell の -EncodedCommand 用に UTF-16LE + Base64 エンコードする
+pub(crate) fn encode_powershell_command(cmd: &str) -> String {
+    use base64::Engine;
+    let utf16le: Vec<u8> = cmd.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
+    base64::engine::general_purpose::STANDARD.encode(&utf16le)
+}
+
+/// bash $'...' (ANSI-C quoting) 用エスケープ
+/// \\ → \\\\, ' → \', 改行 → \n
+pub(crate) fn escape_bash_dollar_quote(s: &str) -> String {
     let mut result = String::with_capacity(s.len() * 2);
     for c in s.chars() {
         match c {
-            '"' => result.push_str("\\\""),
-            '%' => result.push_str("%%"),
-            '&' | '|' | '<' | '>' | '^' | '(' | ')' => {
-                result.push('^');
-                result.push(c);
-            }
+            '\\' => result.push_str("\\\\"),
+            '\'' => result.push_str("\\'"),
+            '\n' => result.push_str("\\n"),
             _ => result.push(c),
         }
     }
@@ -196,7 +195,7 @@ pub fn launch_claude(
     wsl_shell: &WslShell,
     wsl_directory: Option<&str>,
 ) -> Result<(), String> {
-    let prompt = normalize_prompt(prompt);
+    let prompt = normalize_line_endings(prompt);
 
     let resolved_terminal = if *terminal == TerminalType::Auto {
         detect_wt_default_shell()
@@ -214,13 +213,9 @@ pub fn launch_claude(
             let wsl_path = wsl_directory
                 .map(|s| s.to_string())
                 .or_else(|| working_dir.and_then(windows_to_wsl_path));
-            let escaped = prompt.replace("'", "'\\''");
-            let claude_cmd = format!("claude '{}'", escaped);
-            let shell_name = match wsl_shell {
-                WslShell::Bash => "bash",
-                WslShell::Zsh => "zsh",
-                WslShell::Sh => "sh",
-            };
+            let escaped = escape_bash_dollar_quote(&prompt);
+            let claude_cmd = format!("claude $'{}'", escaped);
+            let shell_name = wsl_shell_name(wsl_shell);
 
             args.push("wsl".to_string());
             if let Some(wsl_dir) = wsl_path {
@@ -243,6 +238,7 @@ pub fn launch_claude(
             };
             let escaped = prompt.replace("'", "''");
             let claude_cmd = format!("claude '{}'", escaped);
+            let encoded = encode_powershell_command(&claude_cmd);
             let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
                 crate::windows_util::default_working_dir()
                     .and_then(|p| p.to_str().map(|s| s.to_string()))
@@ -254,25 +250,8 @@ pub fn launch_claude(
                 "--".to_string(),
                 shell.to_string(),
                 "-NoExit".to_string(),
-                "-Command".to_string(),
-                claude_cmd,
-            ]);
-        }
-        TerminalType::Cmd => {
-            let escaped = escape_cmd_meta(&prompt);
-            let claude_cmd = format!("claude \"{}\"", escaped);
-            let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
-                crate::windows_util::default_working_dir()
-                    .and_then(|p| p.to_str().map(|s| s.to_string()))
-            });
-            if let Some(dir) = effective_dir {
-                args.extend(["-d".to_string(), dir]);
-            }
-            args.extend([
-                "--".to_string(),
-                "cmd".to_string(),
-                "/k".to_string(),
-                claude_cmd,
+                "-EncodedCommand".to_string(),
+                encoded,
             ]);
         }
     }
@@ -330,6 +309,7 @@ pub fn resume_claude(
                 "pwsh"
             };
             let claude_cmd = format!("claude --resume '{}'", session_id);
+            let encoded = encode_powershell_command(&claude_cmd);
             let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
                 crate::windows_util::default_working_dir()
                     .and_then(|p| p.to_str().map(|s| s.to_string()))
@@ -341,24 +321,8 @@ pub fn resume_claude(
                 "--".to_string(),
                 shell.to_string(),
                 "-NoExit".to_string(),
-                "-Command".to_string(),
-                claude_cmd,
-            ]);
-        }
-        TerminalType::Cmd => {
-            let claude_cmd = format!("claude --resume \"{}\"", session_id);
-            let effective_dir = working_dir.map(|s| s.to_string()).or_else(|| {
-                crate::windows_util::default_working_dir()
-                    .and_then(|p| p.to_str().map(|s| s.to_string()))
-            });
-            if let Some(dir) = effective_dir {
-                args.extend(["-d".to_string(), dir]);
-            }
-            args.extend([
-                "--".to_string(),
-                "cmd".to_string(),
-                "/k".to_string(),
-                claude_cmd,
+                "-EncodedCommand".to_string(),
+                encoded,
             ]);
         }
     }
@@ -373,45 +337,68 @@ mod tests {
     use super::*;
 
     #[test]
-    fn escape_cmd_meta_basic() {
-        assert_eq!(escape_cmd_meta("hello world"), "hello world");
+    fn normalize_line_endings_preserves_plain_text() {
+        assert_eq!(normalize_line_endings("hello world"), "hello world");
     }
 
     #[test]
-    fn escape_cmd_meta_quotes_and_percent() {
-        assert_eq!(escape_cmd_meta("say \"hi\" 100%"), "say \\\"hi\\\" 100%%");
+    fn normalize_line_endings_preserves_lf() {
+        assert_eq!(normalize_line_endings("line1\nline2"), "line1\nline2");
     }
 
     #[test]
-    fn escape_cmd_meta_shell_operators() {
-        assert_eq!(escape_cmd_meta("a & b | c"), "a ^& b ^| c");
-        assert_eq!(escape_cmd_meta("a > b < c"), "a ^> b ^< c");
-        assert_eq!(escape_cmd_meta("a ^ b"), "a ^^ b");
-        assert_eq!(escape_cmd_meta("(a)"), "^(a^)");
+    fn normalize_line_endings_converts_crlf_to_lf() {
+        assert_eq!(normalize_line_endings("line1\r\nline2"), "line1\nline2");
     }
 
     #[test]
-    fn normalize_prompt_preserves_plain_text() {
-        assert_eq!(normalize_prompt("hello world"), "hello world");
+    fn normalize_line_endings_converts_cr_to_lf() {
+        assert_eq!(normalize_line_endings("line1\rline2"), "line1\nline2");
     }
 
     #[test]
-    fn normalize_prompt_replaces_lf() {
-        assert_eq!(normalize_prompt("line1\nline2"), "line1 line2");
+    fn normalize_line_endings_converts_mixed() {
+        assert_eq!(normalize_line_endings("a\r\nb\nc\rd"), "a\nb\nc\nd");
     }
 
     #[test]
-    fn normalize_prompt_replaces_crlf() {
-        assert_eq!(normalize_prompt("line1\r\nline2"), "line1 line2");
+    fn encode_powershell_command_roundtrip() {
+        use base64::Engine;
+        let original = "claude 'line1\nline2'";
+        let encoded = encode_powershell_command(original);
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&encoded)
+            .unwrap();
+        let utf16: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        let decoded = String::from_utf16(&utf16).unwrap();
+        assert_eq!(decoded, original);
     }
 
     #[test]
-    fn normalize_prompt_replaces_cr() {
-        assert_eq!(normalize_prompt("line1\rline2"), "line1 line2");
+    fn escape_bash_dollar_quote_no_special() {
+        assert_eq!(escape_bash_dollar_quote("hello world"), "hello world");
     }
 
     #[test]
-    fn normalize_prompt_replaces_mixed_newlines() {
-        assert_eq!(normalize_prompt("a\r\nb\nc\rd"), "a b c d");
+    fn escape_bash_dollar_quote_newline() {
+        assert_eq!(escape_bash_dollar_quote("line1\nline2"), "line1\\nline2");
+    }
+
+    #[test]
+    fn escape_bash_dollar_quote_single_quote() {
+        assert_eq!(escape_bash_dollar_quote("it's"), "it\\'s");
+    }
+
+    #[test]
+    fn escape_bash_dollar_quote_backslash() {
+        assert_eq!(escape_bash_dollar_quote("a\\b"), "a\\\\b");
+    }
+
+    #[test]
+    fn escape_bash_dollar_quote_combined() {
+        assert_eq!(escape_bash_dollar_quote("it's\na\\b"), "it\\'s\\na\\\\b");
     }
 }

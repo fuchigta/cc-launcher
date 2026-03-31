@@ -41,7 +41,7 @@ describe("Settings", () => {
 
     expect(optionTexts.some((t) => t?.includes("PowerShell 7"))).toBe(true);
     expect(optionTexts.some((t) => t?.includes("Windows PowerShell"))).toBe(true);
-    expect(optionTexts.some((t) => t?.includes("Command Prompt"))).toBe(true);
+    expect(optionTexts.some((t) => t?.includes("Command Prompt"))).toBe(false);
   });
 
   it("Recordボタンクリックでショートカット記録が開始される", async () => {

@@ -478,6 +478,7 @@ dependencies = [
 name = "cc-launcher"
 version = "0.18.4"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "clap",
  "dirs 5.0.1",

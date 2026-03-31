@@ -47,7 +47,6 @@ pub enum TerminalType {
     Auto,
     Pwsh,
     PowerShell,
-    Cmd,
     Wsl,
 }
 
@@ -161,11 +160,11 @@ mod tests {
 
     #[test]
     fn missing_fields_use_defaults() {
-        let json = r#"{"shortcut":"Ctrl+Space","terminal":"Cmd"}"#;
+        let json = r#"{"shortcut":"Ctrl+Space","terminal":"Pwsh"}"#;
         let config: AppConfig = serde_json::from_str(json).unwrap();
 
         assert_eq!(config.shortcut, "Ctrl+Space");
-        assert_eq!(config.terminal, TerminalType::Cmd);
+        assert_eq!(config.terminal, TerminalType::Pwsh);
         assert_eq!(config.wsl_shell, WslShell::Bash);
         assert!(config.last_directory.is_none());
         assert!(config.recent_directories.is_empty());

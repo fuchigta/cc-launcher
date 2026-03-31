@@ -13,7 +13,7 @@ export interface AppConfig {
   enableOnStartup: boolean;
 }
 
-export type TerminalType = "Auto" | "Pwsh" | "PowerShell" | "Cmd" | "Wsl";
+export type TerminalType = "Auto" | "Pwsh" | "PowerShell" | "Wsl";
 
 export type WslShell = "Bash" | "Zsh" | "Sh";
 
