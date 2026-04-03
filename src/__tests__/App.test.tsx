@@ -33,6 +33,7 @@ describe("App", () => {
       subscriptions: [],
       timeoutSecs: 3600,
       enableOnStartup: false,
+      enableContextMenu: false,
     } as AppConfig);
 
     render(<App />);
@@ -110,6 +111,7 @@ describe("App", () => {
       subscriptions: [],
       timeoutSecs: 3600,
       enableOnStartup: false,
+      enableContextMenu: false,
     } as AppConfig);
 
     render(<App />);
@@ -197,6 +199,7 @@ describe("App", () => {
       subscriptions: [],
       timeoutSecs: 3600,
       enableOnStartup: false,
+      enableContextMenu: false,
     } as AppConfig);
 
     render(<App />);

@@ -5,4 +5,4 @@ import type { SubscriptionConfig } from "./SubscriptionConfig";
 import type { TerminalType } from "./TerminalType";
 import type { WslShell } from "./WslShell";
 
-export type AppConfig = { shortcut: string, terminal: TerminalType, wslShell: WslShell, lastDirectory: string | null, recentDirectories: Array<string>, wslDirectory: string | null, wslRecentDirectories: Array<string>, schedules: Array<ScheduleConfig>, plugins: Array<PluginConfig>, subscriptions: Array<SubscriptionConfig>, timeoutSecs: bigint, enableOnStartup: boolean, };
+export type AppConfig = { shortcut: string, terminal: TerminalType, wslShell: WslShell, lastDirectory: string | null, recentDirectories: Array<string>, wslDirectory: string | null, wslRecentDirectories: Array<string>, schedules: Array<ScheduleConfig>, plugins: Array<PluginConfig>, subscriptions: Array<SubscriptionConfig>, timeoutSecs: bigint, enableOnStartup: boolean, enableContextMenu: boolean, };

@@ -24,6 +24,7 @@ const defaultConfig: AppConfig = {
   subscriptions: [],
   timeoutSecs: 3600,
   enableOnStartup: false,
+  enableContextMenu: false,
 };
 
 const defaultTerminals: TerminalInfo[] = [

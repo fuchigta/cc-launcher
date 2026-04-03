@@ -93,6 +93,43 @@ describe("Settings", () => {
     expect(mockHide).toHaveBeenCalled();
   });
 
+  it("enableContextMenuチェックボックスの状態がconfigに反映される", async () => {
+    const user = userEvent.setup();
+    commandMocks.getConfig.mockResolvedValue({
+      shortcut: "Ctrl+Shift+Space",
+      terminal: "Auto",
+      wslShell: "Bash",
+      lastDirectory: null,
+      recentDirectories: [],
+      wslDirectory: null,
+      wslRecentDirectories: [],
+      schedules: [],
+      plugins: [],
+      subscriptions: [],
+      timeoutSecs: 3600,
+      enableOnStartup: false,
+      enableContextMenu: false,
+    } as AppConfig);
+
+    render(<Settings />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add to Explorer context menu")).toBeInTheDocument();
+    });
+
+    const checkbox = screen.getByLabelText(/Add to Explorer context menu/);
+    expect(checkbox).not.toBeChecked();
+
+    await user.click(checkbox);
+    await user.click(screen.getByText("Save"));
+
+    await waitFor(() => {
+      expect(commandMocks.saveConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ enableContextMenu: true }),
+      );
+    });
+  });
+
   it("terminal=Wslの時にWSL Shell selectが表示される", async () => {
     commandMocks.getConfig.mockResolvedValue({
       shortcut: "Ctrl+Shift+Space",
@@ -107,6 +144,7 @@ describe("Settings", () => {
       subscriptions: [],
       timeoutSecs: 3600,
       enableOnStartup: false,
+      enableContextMenu: false,
     } as AppConfig);
 
     commandMocks.getAvailableTerminals.mockResolvedValue([

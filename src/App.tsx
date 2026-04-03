@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { TerminalType } from "./types";
 import {
@@ -60,8 +61,19 @@ function App() {
       inputRef.current.focus();
     }
 
+    const unlistenDirectory = listen<string>("set-directory", (event) => {
+      const dir = event.payload;
+      setCurrentDirectory(dir);
+      setRecentDirectories((prev) => {
+        const filtered = prev.filter((d) => d !== dir);
+        return [dir, ...filtered].slice(0, 5);
+      });
+      updateRecentDirectory(dir);
+    });
+
     return () => {
       unlistenFocus.then((unlisten) => unlisten());
+      unlistenDirectory.then((unlisten) => unlisten());
     };
   }, []);
 

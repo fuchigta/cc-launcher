@@ -11,6 +11,7 @@ export interface AppConfig {
   subscriptions: SubscriptionConfig[];
   timeoutSecs: number;
   enableOnStartup: boolean;
+  enableContextMenu: boolean;
 }
 
 export type TerminalType = "Auto" | "Pwsh" | "PowerShell" | "Wsl";

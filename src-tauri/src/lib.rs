@@ -22,7 +22,7 @@ use subscription::SubscriptionEngine;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, Runtime,
+    Emitter, Manager, Runtime,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use terminal::TerminalInfo;
@@ -328,6 +328,16 @@ fn get_config() -> AppResult<AppConfig> {
     Ok(AppConfig::load())
 }
 
+fn parse_directory_arg(args: &[String]) -> Option<String> {
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--directory" {
+            return iter.next().cloned();
+        }
+    }
+    None
+}
+
 const STARTUP_RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const STARTUP_APP_NAME: &str = "cc-launcher";
 
@@ -351,9 +361,48 @@ fn sync_startup_registry(enabled: bool) {
     }
 }
 
+const CONTEXT_MENU_KEY_DIR: &str = "Software\\Classes\\Directory\\shell\\cc-launcher";
+const CONTEXT_MENU_KEY_BG: &str = "Software\\Classes\\Directory\\Background\\shell\\cc-launcher";
+
+fn sync_context_menu_registry(enabled: bool) {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let shell_paths = [CONTEXT_MENU_KEY_DIR, CONTEXT_MENU_KEY_BG];
+
+    if enabled {
+        let exe_path = match std::env::current_exe() {
+            Ok(p) => p.to_string_lossy().to_string(),
+            Err(_) => return,
+        };
+        let command_value = format!("\"{}\" --directory \"%V\"", exe_path);
+        let icon_value = format!("{},0", exe_path);
+
+        for shell_path in &shell_paths {
+            let Ok((shell_key, _)) = hkcu.create_subkey_with_flags(shell_path, KEY_WRITE) else {
+                continue;
+            };
+            let _ = shell_key.set_value("", &"cc-launcherで開く");
+            let _ = shell_key.set_value("Icon", &icon_value.as_str());
+
+            let command_path = format!("{}\\command", shell_path);
+            let Ok((cmd_key, _)) = hkcu.create_subkey_with_flags(&command_path, KEY_WRITE) else {
+                continue;
+            };
+            let _ = cmd_key.set_value("", &command_value.as_str());
+        }
+    } else {
+        for shell_path in &shell_paths {
+            let _ = hkcu.delete_subkey_all(shell_path);
+        }
+    }
+}
+
 #[tauri::command]
 fn save_config(new_config: AppConfig) -> AppResult<()> {
     sync_startup_registry(new_config.enable_on_startup);
+    sync_context_menu_registry(new_config.enable_context_menu);
     new_config.save()
 }
 
@@ -619,6 +668,14 @@ fn toggle_main_window<R: Runtime>(app: &tauri::AppHandle<R>) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if let Some(dir) = parse_directory_arg(&args) {
+                let _ = app.emit("set-directory", &dir);
+                show_window(app, "main");
+            } else {
+                toggle_main_window(app);
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -689,6 +746,19 @@ pub fn run() {
             // Register global shortcut
             let config = AppConfig::load();
             sync_startup_registry(config.enable_on_startup);
+            sync_context_menu_registry(config.enable_context_menu);
+
+            // Handle --directory arg on first launch (no existing instance)
+            let args: Vec<String> = std::env::args().collect();
+            if let Some(dir) = parse_directory_arg(&args) {
+                let app_handle_dir = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    let _ = app_handle_dir.emit("set-directory", &dir);
+                    show_window(&app_handle_dir, "main");
+                });
+            }
+
             if let Some(shortcut) = parse_shortcut(&config.shortcut) {
                 let _ = app.global_shortcut().register(shortcut);
             }
@@ -861,6 +931,28 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_directory_arg_found() {
+        let args = vec![
+            "cc-launcher.exe".to_string(),
+            "--directory".to_string(),
+            "C:\\project".to_string(),
+        ];
+        assert_eq!(parse_directory_arg(&args), Some("C:\\project".to_string()));
+    }
+
+    #[test]
+    fn parse_directory_arg_not_found() {
+        let args = vec!["cc-launcher.exe".to_string()];
+        assert_eq!(parse_directory_arg(&args), None);
+    }
+
+    #[test]
+    fn parse_directory_arg_no_value() {
+        let args = vec!["cc-launcher.exe".to_string(), "--directory".to_string()];
+        assert_eq!(parse_directory_arg(&args), None);
+    }
 
     #[test]
     fn unc_to_wsl_path_localhost() {

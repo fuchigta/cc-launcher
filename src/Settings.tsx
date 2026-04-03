@@ -12,6 +12,7 @@ function Settings() {
   const [selectedWslShell, setSelectedWslShell] = useState<WslShell>("Bash");
   const [timeoutInput, setTimeoutInput] = useState<number>(3600);
   const [enableOnStartup, setEnableOnStartup] = useState(true);
+  const [enableContextMenu, setEnableContextMenu] = useState(true);
   const [status, setStatus] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
   const [appVersion, setAppVersion] = useState("");
@@ -31,6 +32,7 @@ function Settings() {
       setSelectedWslShell(cfg.wslShell ?? "Bash");
       setTimeoutInput(cfg.timeoutSecs ?? 3600);
       setEnableOnStartup(cfg.enableOnStartup ?? true);
+      setEnableContextMenu(cfg.enableContextMenu ?? true);
     } catch (error) {
       console.error("Failed to load config:", error);
     }
@@ -80,6 +82,7 @@ function Settings() {
       wslShell: selectedWslShell,
       timeoutSecs: timeoutInput,
       enableOnStartup,
+      enableContextMenu,
     };
 
     try {
@@ -189,6 +192,18 @@ function Settings() {
           Start on Windows login
         </label>
         <small>Automatically launch cc-launcher when you log in to Windows</small>
+      </div>
+
+      <div className="settings-section">
+        <label>
+          <input
+            type="checkbox"
+            checked={enableContextMenu}
+            onChange={(e) => setEnableContextMenu(e.target.checked)}
+          />{" "}
+          Add to Explorer context menu
+        </label>
+        <small>Show "cc-launcherで開く" when right-clicking folders in Explorer</small>
       </div>
 
       {status && <div className="status-message">{status}</div>}

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Register Windows Explorer context menu entries for cc-launcher.
+  "cc-launcherで開く" appears when right-clicking a directory or
+  the background of a directory in Explorer.
+  Removed on uninstall (Permanent="no" is the default).
+  If the user disables context menu in Settings, the app will remove
+  these entries on next launch via sync_context_menu_registry().
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="ContextMenuRegistration" Guid="*">
+        <!-- Directory right-click -->
+        <RegistryKey Root="HKCU"
+                     Key="Software\Classes\Directory\shell\cc-launcher">
+          <RegistryValue Type="string" Value="cc-launcherで開く" />
+          <RegistryValue Name="Icon"
+                         Type="string"
+                         Value="[INSTALLDIR]cc-launcher.exe,0" />
+        </RegistryKey>
+        <RegistryKey Root="HKCU"
+                     Key="Software\Classes\Directory\shell\cc-launcher\command">
+          <RegistryValue Type="string"
+                         Value="&quot;[INSTALLDIR]cc-launcher.exe&quot; --directory &quot;%V&quot;" />
+        </RegistryKey>
+
+        <!-- Directory background right-click -->
+        <RegistryKey Root="HKCU"
+                     Key="Software\Classes\Directory\Background\shell\cc-launcher">
+          <RegistryValue Type="string" Value="cc-launcherで開く" />
+          <RegistryValue Name="Icon"
+                         Type="string"
+                         Value="[INSTALLDIR]cc-launcher.exe,0" />
+        </RegistryKey>
+        <RegistryKey Root="HKCU"
+                     Key="Software\Classes\Directory\Background\shell\cc-launcher\command">
+          <RegistryValue Type="string"
+                         Value="&quot;[INSTALLDIR]cc-launcher.exe&quot; --directory &quot;%V&quot;" />
+        </RegistryKey>
+
+        <!-- KeyPath for component -->
+        <RegistryValue Root="HKCU"
+                       Key="Software\cc-launcher\cc-launcher"
+                       Name="ContextMenu"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

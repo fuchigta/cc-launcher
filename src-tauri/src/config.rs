@@ -31,6 +31,8 @@ pub struct AppConfig {
     pub timeout_secs: u64,
     #[serde(default = "default_true")]
     pub enable_on_startup: bool,
+    #[serde(default = "default_true")]
+    pub enable_context_menu: bool,
 }
 
 fn default_timeout_secs() -> u64 {
@@ -74,6 +76,7 @@ impl Default for AppConfig {
             subscriptions: Vec::new(),
             timeout_secs: 3600,
             enable_on_startup: true,
+            enable_context_menu: true,
         }
     }
 }
@@ -147,6 +150,7 @@ mod tests {
             subscriptions: Vec::new(),
             timeout_secs: 3600,
             enable_on_startup: true,
+            enable_context_menu: true,
         };
 
         let json = serde_json::to_string(&config).unwrap();

@@ -61,11 +61,13 @@
         "language": "ja-JP",
         "fragmentPaths": [
           "wix/add-to-path.wxs",
-          "wix/startup.wxs"
+          "wix/startup.wxs",
+          "wix/context-menu.wxs"
         ],
         "componentRefs": [
           "SystemPath",
-          "StartupRegistration"
+          "StartupRegistration",
+          "ContextMenuRegistration"
         ]
       }
     },
