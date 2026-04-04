@@ -48,8 +48,6 @@ jobs:
           New-Item -ItemType File -Force -Path src-tauri/plugins/bin/imap-watcher.exe
           New-Item -ItemType Directory -Force -Path src-tauri/cli/bin
           New-Item -ItemType File -Force -Path src-tauri/cli/bin/cc-launcher-cli.exe
-          New-Item -ItemType Directory -Force -Path src-tauri/context-menu-handler/bin
-          New-Item -ItemType File -Force -Path src-tauri/context-menu-handler/bin/context_menu_handler.dll
         shell: pwsh
 
       - name: Run all checks

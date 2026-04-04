@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "plugins/folder-watcher", "plugins/imap-watcher", "context-menu-handler"]
+members = [".", "plugins/folder-watcher", "plugins/imap-watcher"]
 
 [package]
 name = "cc-launcher"

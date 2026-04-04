@@ -363,9 +363,6 @@ fn sync_startup_registry(enabled: bool) {
 
 const CONTEXT_MENU_KEY_DIR: &str = "Software\\Classes\\Directory\\shell\\cc-launcher";
 const CONTEXT_MENU_KEY_BG: &str = "Software\\Classes\\Directory\\Background\\shell\\cc-launcher";
-const CONTEXT_MENU_HANDLER_CLSID: &str = "{4CC3A7F2-1B5E-4D9A-8F6C-3E2D1A4B5C7E}";
-const CONTEXT_MENU_CLSID_KEY: &str =
-    "Software\\Classes\\CLSID\\{4CC3A7F2-1B5E-4D9A-8F6C-3E2D1A4B5C7E}";
 
 fn sync_context_menu_registry(enabled: bool) {
     use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
@@ -380,6 +377,7 @@ fn sync_context_menu_registry(enabled: bool) {
             Err(_) => return,
         };
         let icon_value = format!("{},0", exe_path);
+        let command_value = format!("\"{}\" --directory \"%V\"", exe_path);
 
         for shell_path in &shell_paths {
             let Ok((shell_key, _)) = hkcu.create_subkey_with_flags(shell_path, KEY_WRITE) else {
@@ -388,43 +386,15 @@ fn sync_context_menu_registry(enabled: bool) {
             let _ = shell_key.set_value("", &"cc-launcherで開く");
             let _ = shell_key.set_value("Icon", &icon_value.as_str());
 
-            // Remove legacy \command subkey — ExplorerCommandHandler handles invocation.
             let command_path = format!("{}\\command", shell_path);
-            let _ = hkcu.delete_subkey_all(&command_path);
-        }
-
-        // Register COM handler for Windows 11 modern context menu.
-        // The DLL lives next to the exe; skip if not found (e.g. dev builds).
-        let exe_dir = std::path::Path::new(&exe_path)
-            .parent()
-            .map(|p| p.to_path_buf());
-        if let Some(dir) = exe_dir {
-            let dll_path = dir.join("context_menu_handler.dll");
-            if dll_path.exists() {
-                let dll_str = dll_path.to_string_lossy().to_string();
-                let inproc_key = format!("{}\\InprocServer32", CONTEXT_MENU_CLSID_KEY);
-                if let Ok((clsid_key, _)) =
-                    hkcu.create_subkey_with_flags(CONTEXT_MENU_CLSID_KEY, KEY_WRITE)
-                {
-                    let _ = clsid_key.set_value("", &"cc-launcher Context Menu Handler");
-                }
-                if let Ok((inproc, _)) = hkcu.create_subkey_with_flags(&inproc_key, KEY_WRITE) {
-                    let _ = inproc.set_value("", &dll_str.as_str());
-                    let _ = inproc.set_value("ThreadingModel", &"Apartment");
-                }
-                for shell_path in &shell_paths {
-                    if let Ok(key) = hkcu.open_subkey_with_flags(shell_path, KEY_WRITE) {
-                        let _ =
-                            key.set_value("ExplorerCommandHandler", &CONTEXT_MENU_HANDLER_CLSID);
-                    }
-                }
+            if let Ok((cmd_key, _)) = hkcu.create_subkey_with_flags(&command_path, KEY_WRITE) {
+                let _ = cmd_key.set_value("", &command_value.as_str());
             }
         }
     } else {
         for shell_path in &shell_paths {
             let _ = hkcu.delete_subkey_all(shell_path);
         }
-        let _ = hkcu.delete_subkey_all(CONTEXT_MENU_CLSID_KEY);
     }
 }
 
