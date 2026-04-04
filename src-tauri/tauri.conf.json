@@ -62,12 +62,14 @@
         "fragmentPaths": [
           "wix/add-to-path.wxs",
           "wix/startup.wxs",
-          "wix/context-menu.wxs"
+          "wix/context-menu.wxs",
+          "wix/context-menu-modern.wxs"
         ],
         "componentRefs": [
           "SystemPath",
           "StartupRegistration",
-          "ContextMenuRegistration"
+          "ContextMenuRegistration",
+          "ContextMenuModernRegistration"
         ]
       }
     },
@@ -80,7 +82,8 @@
     ],
     "resources": {
       "plugins/bin/folder-watcher.exe": "plugins/folder-watcher.exe",
-      "plugins/bin/imap-watcher.exe": "plugins/imap-watcher.exe"
+      "plugins/bin/imap-watcher.exe": "plugins/imap-watcher.exe",
+      "context-menu-handler/bin/context_menu_handler.dll": "context_menu_handler.dll"
     }
   }
 }

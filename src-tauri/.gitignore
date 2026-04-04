@@ -11,3 +11,6 @@
 
 # Built CLI binary
 /cli/bin/
+
+# Built context menu handler DLL
+/context-menu-handler/bin/

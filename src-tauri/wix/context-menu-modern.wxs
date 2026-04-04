@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Register COM class and ExplorerCommandHandler for Windows 11 modern context menu.
+  The DLL (context_menu_handler.dll) is bundled via tauri.conf.json resources and
+  installed to INSTALLDIR alongside cc-launcher.exe.
+  CLSID: {4CC3A7F2-1B5E-4D9A-8F6C-3E2D1A4B5C7E}
+  Removed on uninstall (Permanent="no" is the default).
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="ContextMenuModernRegistration" Guid="*">
+        <!-- COM class registration -->
+        <RegistryKey Root="HKCU"
+                     Key="Software\Classes\CLSID\{4CC3A7F2-1B5E-4D9A-8F6C-3E2D1A4B5C7E}">
+          <RegistryValue Type="string"
+                         Value="cc-launcher Context Menu Handler" />
+        </RegistryKey>
+        <RegistryKey Root="HKCU"
+                     Key="Software\Classes\CLSID\{4CC3A7F2-1B5E-4D9A-8F6C-3E2D1A4B5C7E}\InprocServer32">
+          <RegistryValue Type="string"
+                         Value="[INSTALLDIR]context_menu_handler.dll" />
+          <RegistryValue Name="ThreadingModel"
+                         Type="string"
+                         Value="Apartment" />
+        </RegistryKey>
+
+        <!-- ExplorerCommandHandler for directory right-click (Windows 11 modern menu) -->
+        <RegistryKey Root="HKCU"
+                     Key="Software\Classes\Directory\shell\cc-launcher">
+          <RegistryValue Name="ExplorerCommandHandler"
+                         Type="string"
+                         Value="{4CC3A7F2-1B5E-4D9A-8F6C-3E2D1A4B5C7E}" />
+        </RegistryKey>
+
+        <!-- ExplorerCommandHandler for background right-click (Windows 11 modern menu) -->
+        <RegistryKey Root="HKCU"
+                     Key="Software\Classes\Directory\Background\shell\cc-launcher">
+          <RegistryValue Name="ExplorerCommandHandler"
+                         Type="string"
+                         Value="{4CC3A7F2-1B5E-4D9A-8F6C-3E2D1A4B5C7E}" />
+        </RegistryKey>
+
+        <!-- KeyPath sentinel -->
+        <RegistryValue Root="HKCU"
+                       Key="Software\cc-launcher\cc-launcher"
+                       Name="ContextMenuModern"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>
