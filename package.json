@@ -1,7 +1,7 @@
 {
   "name": "cc-launcher",
   "private": true,
-  "version": "0.20.0",
+  "version": "0.21.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "build:all": "pnpm build && pnpm build:plugins && pnpm build:context-menu && pnpm build:cli",
     "build:plugins": "cargo build --release --manifest-path src-tauri/plugins/folder-watcher/Cargo.toml && cargo build --release --manifest-path src-tauri/plugins/imap-watcher/Cargo.toml && node -e \"const fs=require('fs');const d='src-tauri/plugins/bin';fs.mkdirSync(d,{recursive:true});fs.copyFileSync('src-tauri/target/release/folder-watcher.exe',d+'/folder-watcher.exe');fs.copyFileSync('src-tauri/target/release/imap-watcher.exe',d+'/imap-watcher.exe')\"",
     "build:context-menu": "cargo build --release --manifest-path src-tauri/context-menu-handler/Cargo.toml && node -e \"const fs=require('fs');const d='src-tauri/context-menu-handler/bin';fs.mkdirSync(d,{recursive:true});fs.copyFileSync('src-tauri/target/release/context_menu_handler.dll',d+'/context_menu_handler.dll')\"",
-    "build:cli":"node -e \"const fs=require('fs');const d='src-tauri/cli/bin';fs.mkdirSync(d,{recursive:true});const f=d+'/cc-launcher-cli.exe';if(!fs.existsSync(f))fs.writeFileSync(f,'')\" && cargo build --release --manifest-path src-tauri/Cargo.toml --bin cc-launcher-cli && node -e \"const fs=require('fs');fs.copyFileSync('src-tauri/target/release/cc-launcher-cli.exe','src-tauri/cli/bin/cc-launcher-cli.exe')\"",
+    "build:cli": "node -e \"const fs=require('fs');const d='src-tauri/cli/bin';fs.mkdirSync(d,{recursive:true});const f=d+'/cc-launcher-cli.exe';if(!fs.existsSync(f))fs.writeFileSync(f,'')\" && cargo build --release --manifest-path src-tauri/Cargo.toml --bin cc-launcher-cli && node -e \"const fs=require('fs');fs.copyFileSync('src-tauri/target/release/cc-launcher-cli.exe','src-tauri/cli/bin/cc-launcher-cli.exe')\"",
     "preview": "vite preview",
     "tauri": "tauri",
     "bump": "node scripts/bump-version.mjs",
