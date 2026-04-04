@@ -20,11 +20,12 @@ use plugin_host::PluginManager;
 use scheduler::SchedulerManager;
 use subscription::SubscriptionEngine;
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, Runtime,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_opener::OpenerExt;
 use terminal::TerminalInfo;
 use tokio::sync::RwLock;
 
@@ -704,9 +705,14 @@ pub fn run() {
                 MenuItem::with_id(app, "show_input", "Show Input", true, None::<&str>)?;
             let manager = MenuItem::with_id(app, "manager", "Manager", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+            let separator = PredefinedMenuItem::separator(app)?;
+            let help = MenuItem::with_id(app, "help", "Help", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-            let menu = Menu::with_items(app, &[&show_input, &manager, &settings, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[&show_input, &manager, &settings, &separator, &help, &quit],
+            )?;
 
             // Build tray icon
             let _tray = TrayIconBuilder::new()
@@ -723,6 +729,12 @@ pub fn run() {
                     }
                     "settings" => {
                         show_window(app, "settings");
+                    }
+                    "help" => {
+                        let _ = app.opener().open_url(
+                            "https://github.com/fuchigta/cc-launcher#使い方",
+                            None::<&str>,
+                        );
                     }
                     "quit" => {
                         app.exit(0);

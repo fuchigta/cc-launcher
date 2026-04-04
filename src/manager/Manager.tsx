@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import SchedulesTab from "./SchedulesTab";
 import PluginsTab from "./PluginsTab";
 import SubscriptionsTab from "./SubscriptionsTab";
@@ -20,7 +21,16 @@ function Manager() {
 
   return (
     <div className="manager-container">
-      <h2>Manager</h2>
+      <div className="manager-header">
+        <h2>Manager</h2>
+        <button
+          className="help-button"
+          title="使い方ガイド"
+          onClick={() => openUrl("https://github.com/fuchigta/cc-launcher#使い方")}
+        >
+          ?
+        </button>
+      </div>
       <div className="tab-nav">
         {tabs.map((tab) => (
           <button

@@ -1,5 +1,16 @@
 {
   "hooks": {
-    "Stop": []
+    "Stop": [],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'FILE=$(cat | jq -r \".tool_input.file_path // empty\" | tr \"\\\\\\\\\" \"/\"); if [[ \"$FILE\" == *\"src-tauri/bindings/\"* ]]; then echo \"src-tauri/bindings/ は ts-rs が自動生成するファイルです。手動編集は禁止されています。pnpm ts:generate で再生成してください。\" >&2; exit 2; fi'"
+          }
+        ]
+      }
+    ]
   }
 }

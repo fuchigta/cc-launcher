@@ -6,10 +6,37 @@
   color: #f6f6f6;
 }
 
-.manager-container h2 {
+.manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
+}
+
+.manager-header h2 {
   font-size: 20px;
   font-weight: 600;
+}
+
+.help-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #555;
+  background: transparent;
+  color: #888;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.help-button:hover {
+  color: #fff;
+  border-color: #888;
 }
 
 /* Tabs */
