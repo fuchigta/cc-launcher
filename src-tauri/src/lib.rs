@@ -379,7 +379,6 @@ fn sync_context_menu_registry(enabled: bool) {
             Ok(p) => p.to_string_lossy().to_string(),
             Err(_) => return,
         };
-        let command_value = format!("\"{}\" --directory \"%V\"", exe_path);
         let icon_value = format!("{},0", exe_path);
 
         for shell_path in &shell_paths {
@@ -389,11 +388,9 @@ fn sync_context_menu_registry(enabled: bool) {
             let _ = shell_key.set_value("", &"cc-launcherで開く");
             let _ = shell_key.set_value("Icon", &icon_value.as_str());
 
+            // Remove legacy \command subkey — ExplorerCommandHandler handles invocation.
             let command_path = format!("{}\\command", shell_path);
-            let Ok((cmd_key, _)) = hkcu.create_subkey_with_flags(&command_path, KEY_WRITE) else {
-                continue;
-            };
-            let _ = cmd_key.set_value("", &command_value.as_str());
+            let _ = hkcu.delete_subkey_all(&command_path);
         }
 
         // Register COM handler for Windows 11 modern context menu.

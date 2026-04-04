@@ -19,12 +19,6 @@
                          Type="string"
                          Value="[INSTALLDIR]cc-launcher.exe,0" />
         </RegistryKey>
-        <RegistryKey Root="HKCU"
-                     Key="Software\Classes\Directory\shell\cc-launcher\command">
-          <RegistryValue Type="string"
-                         Value="&quot;[INSTALLDIR]cc-launcher.exe&quot; --directory &quot;%V&quot;" />
-        </RegistryKey>
-
         <!-- Directory background right-click -->
         <RegistryKey Root="HKCU"
                      Key="Software\Classes\Directory\Background\shell\cc-launcher">
@@ -32,11 +26,6 @@
           <RegistryValue Name="Icon"
                          Type="string"
                          Value="[INSTALLDIR]cc-launcher.exe,0" />
-        </RegistryKey>
-        <RegistryKey Root="HKCU"
-                     Key="Software\Classes\Directory\Background\shell\cc-launcher\command">
-          <RegistryValue Type="string"
-                         Value="&quot;[INSTALLDIR]cc-launcher.exe&quot; --directory &quot;%V&quot;" />
         </RegistryKey>
 
         <!-- KeyPath for component -->
