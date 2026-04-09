@@ -1,5 +1,5 @@
 import type { ExecutionLog } from "../types";
-import { resumeClaudeSession } from "../commands";
+import { resumeClaudeSession, cancelExecution } from "../commands";
 import { formatSource, formatDuration, statusBadgeClass } from "../utils";
 
 interface LogDetailProps {
@@ -16,7 +16,15 @@ function LogDetail({ log, onBack }: LogDetailProps) {
         </button>
         <div className="log-detail-header-right">
           <span className={statusBadgeClass(log.status)}>{log.status}</span>
-          {log.sessionId && (
+          {log.status === "Running" && (
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => cancelExecution(log.id).catch(console.error)}
+            >
+              Cancel
+            </button>
+          )}
+          {log.sessionId && log.status !== "Running" && (
             <button
               className="btn btn-primary btn-sm"
               onClick={() => resumeClaudeSession(log.sessionId!, log.workingDir)}

@@ -308,6 +308,11 @@
   color: #88f;
 }
 
+.badge-cancelled {
+  background: rgba(150, 150, 150, 0.2);
+  color: #aaa;
+}
+
 /* Log detail */
 .log-detail {
   padding: 16px;

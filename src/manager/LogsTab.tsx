@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { ExecutionLog } from "../types";
 import { formatSource, formatDuration, statusBadgeClass } from "../utils";
-import { getLogs, clearLogs } from "../commands";
+import { getLogs, clearLogs, cancelExecution } from "../commands";
 import LogDetail from "./LogDetail";
 
 function LogsTab() {
@@ -73,6 +73,7 @@ function LogsTab() {
                 <th>Prompt</th>
                 <th>Duration</th>
                 <th>Started</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -85,6 +86,19 @@ function LogsTab() {
                   <td className="truncated-cell-wide">{log.prompt}</td>
                   <td>{formatDuration(log.durationMs)}</td>
                   <td>{new Date(log.startedAt).toLocaleString()}</td>
+                  <td>
+                    {log.status === "Running" && (
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cancelExecution(log.id).catch(console.error);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -26,6 +26,8 @@ export function statusBadgeClass(status: string): string {
       return "badge badge-success";
     case "Failed":
       return "badge badge-error";
+    case "Cancelled":
+      return "badge badge-cancelled";
     default:
       return "badge badge-running";
   }

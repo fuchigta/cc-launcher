@@ -3,8 +3,26 @@ use crate::error::AppResult;
 use crate::logs;
 use crate::models::{ExecutionLog, ExecutionSource, ExecutionStatus};
 use chrono::Utc;
-use tauri::Emitter;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tauri::{Emitter, Manager};
+use tokio::sync::{Mutex, Notify};
 use uuid::Uuid;
+
+// --- Running execution registry ---
+
+pub struct RunningExecution {
+    pub pid: u32,
+    pub cancel: Arc<Notify>,
+}
+
+pub struct RunningExecutionRegistry(pub Arc<Mutex<HashMap<String, RunningExecution>>>);
+
+impl RunningExecutionRegistry {
+    pub fn new() -> Self {
+        Self(Arc::new(Mutex::new(HashMap::new())))
+    }
+}
 
 enum ShellCommand {
     /// 通常のコマンド文字列（-Command / -c に渡す）
@@ -141,40 +159,98 @@ pub async fn execute(
 
     let mut cmd = tokio::process::Command::from(std_cmd);
 
+    let child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            let err_msg = format!("Failed to execute claude: {}", e);
+            let completed_at = Utc::now();
+            let duration_ms = (completed_at - started_at).num_milliseconds() as u64;
+            let log = ExecutionLog {
+                id,
+                session_id: Some(session_id),
+                source,
+                prompt: prompt.to_string(),
+                working_dir: working_dir.map(|s| s.to_string()),
+                claude_args: claude_args.to_vec(),
+                status: ExecutionStatus::Failed,
+                stdout: String::new(),
+                stderr: err_msg,
+                exit_code: None,
+                started_at,
+                completed_at: Some(completed_at),
+                duration_ms: Some(duration_ms),
+            };
+            logs::write_log(&log).ok();
+            send_notification(app_handle, &log);
+            let _ = app_handle.emit("execution-completed", &log);
+            return Ok(log);
+        }
+    };
+
+    let pid = child.id().unwrap_or(0);
+
+    let cancel_notify = Arc::new(Notify::new());
+    if let Some(registry) = app_handle.try_state::<RunningExecutionRegistry>() {
+        let mut guard = registry.0.lock().await;
+        guard.insert(
+            id.clone(),
+            RunningExecution {
+                pid,
+                cancel: cancel_notify.clone(),
+            },
+        );
+    }
+
     let timeout_secs = config.timeout_secs;
     let timeout_dur = std::time::Duration::from_secs(timeout_secs);
-    let timeout_result = tokio::time::timeout(timeout_dur, cmd.output()).await;
+
+    let (status, stdout, stderr, exit_code) = tokio::select! {
+        result = child.wait_with_output() => {
+            match result {
+                Ok(output) => {
+                    let status = if output.status.success() {
+                        ExecutionStatus::Success
+                    } else {
+                        ExecutionStatus::Failed
+                    };
+                    (
+                        status,
+                        String::from_utf8_lossy(&output.stdout).to_string(),
+                        String::from_utf8_lossy(&output.stderr).to_string(),
+                        output.status.code(),
+                    )
+                }
+                Err(e) => (
+                    ExecutionStatus::Failed,
+                    String::new(),
+                    format!("Failed to execute claude: {}", e),
+                    None,
+                ),
+            }
+        },
+        _ = tokio::time::sleep(timeout_dur) => {
+            crate::windows_util::kill_process_tree(pid);
+            (
+                ExecutionStatus::Failed,
+                String::new(),
+                format!("Claude execution timed out ({}s)", timeout_secs),
+                None,
+            )
+        },
+        _ = cancel_notify.notified() => {
+            crate::windows_util::kill_process_tree(pid);
+            (ExecutionStatus::Cancelled, String::new(), String::new(), None)
+        },
+    };
+
+    // レジストリから除去
+    if let Some(registry) = app_handle.try_state::<RunningExecutionRegistry>() {
+        let mut guard = registry.0.lock().await;
+        guard.remove(&id);
+    }
 
     let completed_at = Utc::now();
     let duration_ms = (completed_at - started_at).num_milliseconds() as u64;
-
-    let (status, stdout, stderr, exit_code) = match timeout_result {
-        Err(_) => (
-            ExecutionStatus::Failed,
-            String::new(),
-            format!("Claude execution timed out ({}s)", timeout_secs),
-            None,
-        ),
-        Ok(Err(e)) => (
-            ExecutionStatus::Failed,
-            String::new(),
-            format!("Failed to execute claude: {}", e),
-            None,
-        ),
-        Ok(Ok(output)) => {
-            let status = if output.status.success() {
-                ExecutionStatus::Success
-            } else {
-                ExecutionStatus::Failed
-            };
-            (
-                status,
-                String::from_utf8_lossy(&output.stdout).to_string(),
-                String::from_utf8_lossy(&output.stderr).to_string(),
-                output.status.code(),
-            )
-        }
-    };
 
     let log = ExecutionLog {
         id,
@@ -217,6 +293,7 @@ fn send_notification(app_handle: &tauri::AppHandle, log: &ExecutionLog) {
         ExecutionStatus::Success => "Claude Code: Success",
         ExecutionStatus::Failed => "Claude Code: Failed",
         ExecutionStatus::Running => "Claude Code: Running",
+        ExecutionStatus::Cancelled => "Claude Code: Cancelled",
     };
 
     let body = notification_body(&log.prompt, &log.stdout);

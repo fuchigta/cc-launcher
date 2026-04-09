@@ -38,6 +38,23 @@ struct AppState {
 // --- Headless execution commands ---
 
 #[tauri::command]
+async fn cancel_execution(app_handle: tauri::AppHandle, id: String) -> AppResult<()> {
+    let registry = app_handle.state::<headless::RunningExecutionRegistry>();
+    let entry = {
+        let guard = registry.0.lock().await;
+        guard.get(&id).map(|e| (e.pid, e.cancel.clone()))
+    };
+    let Some((pid, cancel)) = entry else {
+        return Err(AppError::Execution(
+            "Execution not found or already finished".into(),
+        ));
+    };
+    cancel.notify_one();
+    windows_util::kill_process_tree(pid);
+    Ok(())
+}
+
+#[tauri::command]
 async fn run_headless(
     app_handle: tauri::AppHandle,
     prompt: String,
@@ -699,6 +716,7 @@ pub fn run() {
             plugin_manager: Arc::new(RwLock::new(None)),
             subscription_engine: Arc::new(RwLock::new(None)),
         })
+        .manage(headless::RunningExecutionRegistry::new())
         .setup(|app| {
             // Create tray menu
             let show_input =
@@ -916,6 +934,7 @@ pub fn run() {
             get_wsl_root_path,
             unc_to_wsl_path,
             run_headless,
+            cancel_execution,
             get_logs,
             get_log,
             clear_logs,

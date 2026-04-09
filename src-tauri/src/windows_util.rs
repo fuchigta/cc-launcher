@@ -38,6 +38,16 @@ pub fn get_cursor_monitor_work_area() -> Option<(i32, i32, i32, i32)> {
     }
 }
 
+/// プロセスツリー全体を強制終了する（taskkill /T /F /PID）
+///
+/// wsl.exe や powershell.exe の子プロセスも含めて全て kill する。
+/// 既に終了している場合などのエラーは無視する。
+pub fn kill_process_tree(pid: u32) {
+    let _ = no_window_command("taskkill")
+        .args(["/T", "/F", "/PID", &pid.to_string()])
+        .status();
+}
+
 /// デフォルト作業ディレクトリ（%USERPROFILE%\cc-launcher）を取得・作成
 pub fn default_working_dir() -> Option<std::path::PathBuf> {
     let dir = dirs::home_dir()?.join("cc-launcher");

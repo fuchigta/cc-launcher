@@ -30,6 +30,7 @@ pub enum ExecutionStatus {
     Running,
     Success,
     Failed,
+    Cancelled,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
@@ -236,6 +237,15 @@ mod tests {
         let event: PluginEvent = serde_json::from_str(json).unwrap();
         assert_eq!(event.event_type, "file_changed");
         assert_eq!(event.data["path"], "/tmp/test.txt");
+    }
+
+    #[test]
+    fn execution_status_cancelled_serde() {
+        let status = ExecutionStatus::Cancelled;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"Cancelled\"");
+        let restored: ExecutionStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, ExecutionStatus::Cancelled);
     }
 
     #[test]

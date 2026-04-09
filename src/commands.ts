@@ -33,6 +33,7 @@ export const resumeClaudeSession = (sessionId: string, workingDir: string | null
 export const getLogs = (limit: number, offset: number) =>
   invoke<ExecutionLog[]>("get_logs", { limit, offset });
 export const clearLogs = () => invoke("clear_logs");
+export const cancelExecution = (id: string) => invoke<void>("cancel_execution", { id });
 
 // --- Schedules ---
 export const getSchedules = () => invoke<ScheduleConfig[]>("get_schedules");
