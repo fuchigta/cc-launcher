@@ -68,6 +68,25 @@ function FolderWatcherForm({
 }) {
   return (
     <>
+      <div className="notice-box notice-box-warning">
+        起動前から存在するファイルはイベントを発火しません。起動後の変更のみ検知します。 また Filter
+        glob はファイル名のみに適用されます（例: <code>*.rs</code>
+        ）。パスを含むパターンは機能しません。
+      </div>
+      <div className="notice-box notice-box-info">
+        <strong>発火するイベント:</strong>
+        <div className="event-chips">
+          {["file_created", "file_changed", "file_deleted", "file_renamed"].map((ev) => (
+            <span key={ev} className="event-chip">
+              {ev}
+            </span>
+          ))}
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11 }}>
+          各イベントの data フィールド: <code>file_path</code>, <code>timestamp</code>（file_renamed
+          は <code>old_path</code>, <code>new_path</code>）
+        </div>
+      </div>
       <div className="form-group">
         <label>Directory</label>
         <input
@@ -188,6 +207,20 @@ function ImapWatcherForm({
 }) {
   return (
     <>
+      <div className="notice-box notice-box-warning">
+        起動時点でメールボックスに存在する未読メールはイベントを発火しません。起動後に新着したメールのみが対象です。
+        また パスワードは config.json に平文で保存されます。
+      </div>
+      <div className="notice-box notice-box-info">
+        <strong>発火するイベント:</strong>
+        <div className="event-chips">
+          <span className="event-chip">new_mail</span>
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11 }}>
+          data フィールド: <code>from</code>, <code>subject</code>, <code>body_text</code>,{" "}
+          <code>body_html</code>, <code>date</code>, <code>message_id</code>, <code>timestamp</code>
+        </div>
+      </div>
       <div className="form-group">
         <label>Server</label>
         <input

@@ -94,11 +94,13 @@
 
 **プラグインの種類:**
 
-| タイプ | 説明 |
-|--------|------|
-| Custom | 任意の実行ファイルをプラグインとして登録 |
-| Folder Watcher（内蔵） | 指定ディレクトリのファイル変更を監視 |
-| IMAP Watcher（内蔵） | メールボックスの受信を監視 |
+| タイプ | 説明 | 発火するイベント |
+|--------|------|----------------|
+| Custom | 任意の実行ファイルをプラグインとして登録 | プラグイン実装次第 |
+| Folder Watcher（内蔵） | 指定ディレクトリのファイル変更を監視 | `file_created` / `file_changed` / `file_deleted` / `file_renamed` |
+| IMAP Watcher（内蔵） | メールボックスの受信を監視 | `new_mail` |
+
+各イベントの `data` フィールドの詳細は [docs/plugins.md](docs/plugins.md) を参照してください。
 
 **Folder Watcher の設定:**
 
@@ -106,20 +108,24 @@
 |-----------|------|
 | Directory | 監視するディレクトリ |
 | Recursive | サブディレクトリも監視するか |
-| Filter Globs | 対象ファイルのglobパターン（例: `*.rs`） |
-| Ignore Patterns | 除外パターン |
-| Debounce (ms) | 変更検知のデバウンス時間 |
+| Filter Globs | 対象ファイルのglobパターン（例: `*.rs`）。ファイル名のみに適用 |
+| Ignore Patterns | 除外パターン（ディレクトリ/ファイル名との完全一致） |
+| Debounce (ms) | 変更検知のデバウンス時間（パス単位で coalesce） |
+
+> **注意:** 起動前から存在するファイルはイベントを発火しません。起動後の変更のみ検知します。
 
 **IMAP Watcher の設定:**
 
 | フィールド | 説明 |
 |-----------|------|
 | Server / Port | IMAPサーバーとポート番号 |
-| User / Password | 認証情報 |
+| User / Password | 認証情報（config.json に平文保存） |
 | Folder | 監視するメールフォルダ（例: `INBOX`） |
-| Poll Interval (ms) | ポーリング間隔 |
+| Poll Interval (s) | ポーリング間隔（IDLE 利用時はタイムアウト間隔） |
 | TLS | TLS/SSLを使用するか |
-| Subject Match / Body Match | フィルタ用の正規表現（省略可） |
+| Subject Match / Body Match | フィルタ用の正規表現（大文字小文字無視、省略可） |
+
+> **注意:** 起動時点でメールボックスに存在する未読メールはイベントを発火しません。起動後に新着したメールのみが対象です。`body_match` は text/plain 本文のみに適用されます。
 
 **ステータス表示:** 各プラグインのステータスがリアルタイムに表示されます。
 
@@ -156,6 +162,14 @@
 ```
 
 Folder Watcherが `file_path` フィールドを持つイベントを送出した場合、`{{file_path}}` が実際のパスに展開されます。
+
+**テンプレートの仕様:**
+
+- `data` の**トップレベルキーのみ**が置換対象です。`{{user.name}}` のようなネスト記法は未サポートです。
+- 存在しないキーを指定した場合、`{{key}}` のままプロンプトに残ります（エラーにはなりません）。
+- `Plugin Name` / `Event Type` のマッチングは `*`（全マッチ）か**完全一致**のみです。
+
+詳細な仕様は [docs/plugins.md](docs/plugins.md) を参照してください。
 
 **アクション:** Duplicate / Edit / Delete
 
