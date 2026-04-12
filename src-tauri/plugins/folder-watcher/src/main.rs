@@ -123,9 +123,12 @@ fn should_ignore(path: &Path, ignore_patterns: &[String]) -> bool {
     })
 }
 
-fn matches_filter(path: &Path, filter_set: &Option<GlobSet>) -> bool {
+fn matches_filter(path: &Path, watch_dir: &Path, filter_set: &Option<GlobSet>) -> bool {
     match filter_set {
-        Some(set) => path.file_name().is_some_and(|name| set.is_match(name)),
+        Some(set) => {
+            let relative = path.strip_prefix(watch_dir).unwrap_or(path);
+            set.is_match(relative)
+        }
         None => true,
     }
 }
@@ -333,7 +336,7 @@ fn run_watcher(
                     if should_ignore(path, ignore_patterns) {
                         continue;
                     }
-                    if !matches_filter(path, filter_set) {
+                    if !matches_filter(path, watch_dir, filter_set) {
                         continue;
                     }
 
