@@ -21,6 +21,7 @@ impl SubscriptionEngine {
 
     pub async fn process_event(
         &self,
+        plugin_id: &str,
         plugin_name: &str,
         event: &PluginEvent,
         app_handle: &tauri::AppHandle,
@@ -31,7 +32,9 @@ impl SubscriptionEngine {
                 continue;
             }
 
-            let name_match = sub.plugin_name == "*" || sub.plugin_name == plugin_name;
+            let name_match = sub.plugin_name == "*"
+                || sub.plugin_name == plugin_id
+                || sub.plugin_name == plugin_name;
             let type_match = sub.event_type == "*" || sub.event_type == event.event_type;
 
             if !name_match || !type_match {
@@ -62,10 +65,11 @@ fn expand_template(template: &str, data: &serde_json::Value) -> String {
     if let Some(obj) = data.as_object() {
         for (key, value) in obj {
             let placeholder = format!("{{{{{}}}}}", key);
-            let replacement = match value {
+            let raw = match value {
                 serde_json::Value::String(s) => s.clone(),
                 other => other.to_string(),
             };
+            let replacement = format!("<data key=\"{}\">{}</data>", key, raw);
             result = result.replace(&placeholder, &replacement);
         }
     }
@@ -80,28 +84,34 @@ mod tests {
     fn expand_template_basic() {
         let data = serde_json::json!({"name": "test"});
         let result = expand_template("Hello {{name}}!", &data);
-        assert_eq!(result, "Hello test!");
+        assert_eq!(result, r#"Hello <data key="name">test</data>!"#);
     }
 
     #[test]
     fn expand_template_multiple_placeholders() {
         let data = serde_json::json!({"file": "main.rs", "line": "42"});
         let result = expand_template("Error in {{file}} at line {{line}}", &data);
-        assert_eq!(result, "Error in main.rs at line 42");
+        assert_eq!(
+            result,
+            r#"Error in <data key="file">main.rs</data> at line <data key="line">42</data>"#
+        );
     }
 
     #[test]
     fn expand_template_non_string_values() {
         let data = serde_json::json!({"count": 5, "active": true});
         let result = expand_template("Items: {{count}}, Active: {{active}}", &data);
-        assert_eq!(result, "Items: 5, Active: true");
+        assert_eq!(
+            result,
+            r#"Items: <data key="count">5</data>, Active: <data key="active">true</data>"#
+        );
     }
 
     #[test]
     fn expand_template_missing_key_kept() {
         let data = serde_json::json!({"name": "test"});
         let result = expand_template("{{name}} {{missing}}", &data);
-        assert_eq!(result, "test {{missing}}");
+        assert_eq!(result, r#"<data key="name">test</data> {{missing}}"#);
     }
 
     #[test]
@@ -129,6 +139,9 @@ mod tests {
     fn expand_template_nested_object() {
         let data = serde_json::json!({"user": {"id": 1, "name": "test"}});
         let result = expand_template("User: {{user}}", &data);
-        assert_eq!(result, r#"User: {"id":1,"name":"test"}"#);
+        assert_eq!(
+            result,
+            r#"User: <data key="user">{"id":1,"name":"test"}</data>"#
+        );
     }
 }

@@ -27,9 +27,13 @@ struct Cli {
     #[arg(long)]
     user: String,
 
-    /// Password
+    /// Password (prefer --password-env for security)
+    #[arg(long, required_unless_present = "password_env")]
+    password: Option<String>,
+
+    /// Environment variable name containing the password
     #[arg(long)]
-    password: String,
+    password_env: Option<String>,
 
     /// IMAP folder to watch
     #[arg(long, default_value = "INBOX")]
@@ -118,13 +122,24 @@ fn compile_filter(pattern: &Option<String>) -> Option<Regex> {
 
 fn matches_filters(
     subject: &str,
-    body: &str,
+    body_text: &str,
+    body_html: &str,
     subject_re: &Option<Regex>,
     body_re: &Option<Regex>,
 ) -> bool {
     let subject_ok = subject_re.as_ref().is_none_or(|re| re.is_match(subject));
-    let body_ok = body_re.as_ref().is_none_or(|re| re.is_match(body));
+    let body_ok = body_re.as_ref().is_none_or(|re| {
+        re.is_match(body_text)
+            || (!body_html.is_empty() && re.is_match(&strip_html_tags(body_html)))
+    });
     subject_ok && body_ok
+}
+
+fn strip_html_tags(html: &str) -> String {
+    let tag_re = Regex::new(r"<[^>]+>").unwrap();
+    let text = tag_re.replace_all(html, "");
+    let entity_re = Regex::new(r"&(?:#\d+|#x[0-9a-fA-F]+|\w+);").unwrap();
+    entity_re.replace_all(&text, " ").trim().to_string()
 }
 
 // --- Mail parsing ---
@@ -262,8 +277,9 @@ fn fetch_and_process_new_mails(
             if let Some(mail_data) = extract_mail_data(body) {
                 let subject = mail_data["subject"].as_str().unwrap_or("");
                 let body_text = mail_data["body_text"].as_str().unwrap_or("");
+                let body_html = mail_data["body_html"].as_str().unwrap_or("");
 
-                if matches_filters(subject, body_text, subject_re, body_re) {
+                if matches_filters(subject, body_text, body_html, subject_re, body_re) {
                     send_event("new_mail", mail_data);
                 }
             }
@@ -276,13 +292,18 @@ fn fetch_and_process_new_mails(
 
 // --- Watch loop ---
 
-fn run_imap_watcher(cli: &Cli, subject_re: &Option<Regex>, body_re: &Option<Regex>) {
+fn run_imap_watcher(
+    cli: &Cli,
+    password: &str,
+    subject_re: &Option<Regex>,
+    body_re: &Option<Regex>,
+) {
     let mut backoff = 1u64;
 
     loop {
         eprintln!("Connecting to {}:{}...", cli.server, cli.port);
 
-        let mut session = match connect_imap(&cli.server, cli.port, &cli.user, &cli.password) {
+        let mut session = match connect_imap(&cli.server, cli.port, &cli.user, password) {
             Ok(s) => {
                 backoff = 1;
                 s
@@ -374,6 +395,20 @@ fn run_imap_watcher(cli: &Cli, subject_re: &Option<Regex>, body_re: &Option<Rege
 
 // --- Main ---
 
+fn resolve_password(cli: &Cli) -> String {
+    if let Some(ref env_var) = cli.password_env {
+        std::env::var(env_var).unwrap_or_else(|_| {
+            eprintln!("Environment variable '{}' not set", env_var);
+            std::process::exit(1);
+        })
+    } else {
+        cli.password.clone().unwrap_or_else(|| {
+            eprintln!("Either --password or --password-env is required");
+            std::process::exit(1);
+        })
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -416,11 +451,12 @@ fn main() {
 
                 // Start watching in a separate thread
                 let thread_cli = cli.clone();
+                let thread_password = resolve_password(&cli);
                 let subject_re2 = subject_re.clone();
                 let body_re2 = body_re.clone();
 
                 std::thread::spawn(move || {
-                    run_imap_watcher(&thread_cli, &subject_re2, &body_re2);
+                    run_imap_watcher(&thread_cli, &thread_password, &subject_re2, &body_re2);
                 });
             }
             "shutdown" => {
