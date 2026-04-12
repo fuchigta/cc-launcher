@@ -61,7 +61,16 @@ function PluginsTab() {
 
   const renderStatusBadge = (status: PluginStatus | undefined): React.ReactNode => {
     if (status?.running) {
-      return <span className="badge badge-success">Running (PID: {status.pid})</span>;
+      return (
+        <>
+          <span className="badge badge-success">Running (PID: {status.pid})</span>
+          {status.lastStderr && (
+            <div className="stderr-line" title={status.lastStderr}>
+              {status.lastStderr}
+            </div>
+          )}
+        </>
+      );
     }
     if (status?.error) {
       return <span className="badge badge-error">{status.error}</span>;

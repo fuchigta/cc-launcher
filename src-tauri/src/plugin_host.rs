@@ -16,18 +16,19 @@ struct PluginHandle {
     pid: Option<u32>,
     last_event_at: Option<chrono::DateTime<Utc>>,
     error: Option<String>,
+    last_stderr: Option<String>,
     shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 pub struct PluginManager {
     plugins: Arc<RwLock<HashMap<String, PluginHandle>>>,
-    event_tx: mpsc::Sender<(String, PluginEvent)>,
+    event_tx: mpsc::Sender<(String, String, PluginEvent)>,
     app_handle: tauri::AppHandle,
 }
 
 impl PluginManager {
     pub fn new(
-        event_tx: mpsc::Sender<(String, PluginEvent)>,
+        event_tx: mpsc::Sender<(String, String, PluginEvent)>,
         app_handle: tauri::AppHandle,
     ) -> Self {
         Self {
@@ -88,7 +89,7 @@ impl PluginManager {
 
         std_cmd.stdin(std::process::Stdio::piped());
         std_cmd.stdout(std::process::Stdio::piped());
-        std_cmd.stderr(std::process::Stdio::null());
+        std_cmd.stderr(std::process::Stdio::piped());
 
         let mut cmd = Command::from(std_cmd);
         let mut child = cmd
@@ -140,6 +141,32 @@ impl PluginManager {
             Err(_) => return Err("Plugin init timed out".to_string()),
         }
 
+        // Spawn stderr reader task
+        let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
+        {
+            let plugins = self.plugins.clone();
+            let plugin_id = config.id.clone();
+            let mut stderr_reader = BufReader::new(stderr);
+            tokio::spawn(async move {
+                let mut buf = String::new();
+                loop {
+                    buf.clear();
+                    match stderr_reader.read_line(&mut buf).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {
+                            let line = buf.trim().to_string();
+                            if !line.is_empty() {
+                                let mut handles = plugins.write().await;
+                                if let Some(handle) = handles.get_mut(&plugin_id) {
+                                    handle.last_stderr = Some(line);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         // Spawn stdout reader task
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel();
         let event_tx = self.event_tx.clone();
@@ -187,7 +214,7 @@ impl PluginManager {
                                     handle.last_event_at = Some(Utc::now());
                                 }
                                 drop(handles);
-                                let _ = event_tx.send((plugin_name.clone(), event)).await;
+                                let _ = event_tx.send((plugin_id.clone(), plugin_name.clone(), event)).await;
                             }
                         }
                     }
@@ -202,6 +229,7 @@ impl PluginManager {
             pid,
             last_event_at: None,
             error: None,
+            last_stderr: None,
             shutdown_tx: Some(shutdown_tx),
         };
 
@@ -266,6 +294,7 @@ impl PluginManager {
                 pid: h.pid,
                 last_event_at: h.last_event_at,
                 error: h.error.clone(),
+                last_stderr: h.last_stderr.clone(),
             })
             .collect()
     }

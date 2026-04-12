@@ -83,6 +83,7 @@ export interface PluginStatus {
   pid: number | null;
   lastEventAt: string | null;
   error: string | null;
+  lastStderr: string | null;
 }
 
 // --- Subscription ---

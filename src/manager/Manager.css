@@ -393,6 +393,17 @@
   white-space: nowrap;
 }
 
+/* stderr line */
+.stderr-line {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #aaa;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Pagination */
 .pagination {
   display: flex;

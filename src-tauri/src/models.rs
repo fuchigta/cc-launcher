@@ -112,6 +112,7 @@ pub struct PluginStatus {
     pub pid: Option<u32>,
     pub last_event_at: Option<DateTime<Utc>>,
     pub error: Option<String>,
+    pub last_stderr: Option<String>,
 }
 
 // --- JSON-RPC 2.0 ---

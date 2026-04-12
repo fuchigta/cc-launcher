@@ -836,12 +836,12 @@ pub fn run() {
 
                 // Event loop: route plugin events to subscription engine
                 let app_for_events = app_handle2.clone();
-                while let Some((plugin_name, event)) = event_rx.recv().await {
+                while let Some((plugin_id, plugin_name, event)) = event_rx.recv().await {
                     let state = app_for_events.state::<AppState>();
                     let guard = state.subscription_engine.read().await;
                     if let Some(engine) = guard.as_ref() {
                         engine
-                            .process_event(&plugin_name, &event, &app_for_events)
+                            .process_event(&plugin_id, &plugin_name, &event, &app_for_events)
                             .await;
                     }
                 }
