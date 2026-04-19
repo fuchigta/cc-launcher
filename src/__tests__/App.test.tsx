@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
 import type { AppConfig } from "../types";
@@ -180,6 +180,30 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(commandMocks.openClaudeInteractive).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("IME変換確定直後のEnterで改行挿入されずsubmitされる", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() => {
+      expect(commandMocks.getConfig).toHaveBeenCalled();
+    });
+
+    const textarea = screen.getByPlaceholderText("Ask Claude...") as HTMLTextAreaElement;
+    await user.click(textarea);
+
+    // IME 変換確定をシミュレート（旧コードではここでフラグが立ち次の Enter がブロックされていた）
+    fireEvent.compositionEnd(textarea, { data: "" });
+
+    // フラグが立った状態でテキスト入力 → Enter
+    await user.type(textarea, "hello");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(commandMocks.openClaudeInteractive).toHaveBeenCalledWith("hello", null);
+      expect(commandMocks.hideWindow).toHaveBeenCalled();
     });
   });
 

@@ -110,4 +110,5 @@ beforeEach(() => {
   commandMocks.getSubscriptions.mockImplementation(() => Promise.resolve([]));
   commandMocks.getPluginStatuses.mockImplementation(() => Promise.resolve([]));
   commandMocks.testRunSchedule.mockImplementation(() => Promise.resolve(""));
+  commandMocks.openClaudeInteractive.mockImplementation(() => Promise.resolve());
 });
