@@ -544,9 +544,10 @@ fn decode_utf16le(bytes: &[u8]) -> String {
     } else {
         0
     };
+    let (chunks, _) = bytes[start..].as_chunks::<2>();
     String::from_utf16_lossy(
-        &bytes[start..]
-            .chunks_exact(2)
+        &chunks
+            .iter()
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect::<Vec<_>>(),
     )
