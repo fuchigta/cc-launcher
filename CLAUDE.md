@@ -51,6 +51,8 @@ pnpm tag            # 現在バージョンのgitタグを作成してmain・タ
 - JavaScript: `pnpm js:lint` + `pnpm js:fmt:check`
 - Rust: `pnpm rs:lint` + `pnpm rs:fmt:check`
 
+複雑度チェック（cccc）はCIの `complexity` ジョブで実行される（閾値は `cccc.toml`）。ローカルでは `cccc .`（`--table` で表形式）で確認できる。
+
 ## 動作確認
 
 **テスト実行**

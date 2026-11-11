@@ -58,3 +58,16 @@ jobs:
 
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  complexity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check code complexity (thresholds in cccc.toml)
+        uses: moznion/cccc-action@v1.1.2
+        with:
+          version: v1.8.6
+          path: .
