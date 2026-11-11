@@ -1,0 +1,12 @@
+# cccc (https://github.com/moznion/cccc) の設定
+# 認知的複雑度・循環的複雑度のゲート。CI の complexity ジョブで使用する。
+#
+# 閾値は「現状より悪化させない」ためのラチェット。
+# 標準的な閾値 (cognitive 15 / cyclomatic 10) では既存コードが落ちるため、
+# 2026-11 時点の実測値 (61 ファイル・821 関数) の max の少し上に置いている:
+#   - 認知的複雑度 max 29 (src-tauri/plugins/imap-watcher の run_imap_watcher)
+#   - 循環的複雑度 max 16 (src-tauri/plugins/folder-watcher の run_watcher)
+# リファクタリングで max が下がったら、この閾値も下げていくこと。
+
+max-cognitive = 30
+max-cyclomatic = 18
