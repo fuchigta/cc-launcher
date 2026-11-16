@@ -294,13 +294,12 @@ fn main() {
     std::process::exit(0);
 }
 
-fn run_watcher(
+/// Create a watcher on `watch_dir` that forwards events to the returned receiver.
+/// Logs and returns `None` on failure.
+fn create_watcher(
     watch_dir: &Path,
     recursive: bool,
-    debounce_ms: u64,
-    ignore_patterns: &[String],
-    filter_set: &Option<GlobSet>,
-) {
+) -> Option<(notify::RecommendedWatcher, std_mpsc::Receiver<Event>)> {
     let (tx, rx) = std_mpsc::channel();
 
     let mut watcher = match notify::recommended_watcher(move |res: Result<Event, _>| {
@@ -311,7 +310,7 @@ fn run_watcher(
         Ok(w) => w,
         Err(e) => {
             eprintln!("Failed to create watcher: {}", e);
-            return;
+            return None;
         }
     };
 
@@ -323,65 +322,114 @@ fn run_watcher(
 
     if let Err(e) = watcher.watch(watch_dir, mode) {
         eprintln!("Failed to watch directory: {}", e);
-        return;
+        return None;
     }
+
+    Some((watcher, rx))
+}
+
+fn handle_create(
+    path: &Path,
+    timestamp: String,
+    debouncer: &mut Debouncer,
+    rename_tracker: &mut RenameTracker,
+) {
+    if let Some(old_path) = rename_tracker.on_create(path) {
+        // This is a rename (remove followed by create)
+        send_event(
+            "file_renamed",
+            serde_json::json!({
+                "old_path": old_path.to_string_lossy(),
+                "new_path": path.to_string_lossy(),
+                "timestamp": timestamp,
+            }),
+        );
+    } else {
+        debouncer.add(
+            path.to_path_buf(),
+            "file_created".to_string(),
+            serde_json::json!({
+                "file_path": path.to_string_lossy(),
+                "timestamp": timestamp,
+            }),
+        );
+    }
+}
+
+fn handle_path_event(
+    kind: &EventKind,
+    path: &Path,
+    debouncer: &mut Debouncer,
+    rename_tracker: &mut RenameTracker,
+) {
+    let timestamp = Utc::now().to_rfc3339();
+
+    match kind {
+        EventKind::Create(_) => {
+            handle_create(path, timestamp, debouncer, rename_tracker);
+        }
+        EventKind::Modify(_) => {
+            debouncer.add(
+                path.to_path_buf(),
+                "file_changed".to_string(),
+                serde_json::json!({
+                    "file_path": path.to_string_lossy(),
+                    "timestamp": timestamp,
+                }),
+            );
+        }
+        EventKind::Remove(_) => {
+            rename_tracker.on_remove(path.to_path_buf());
+        }
+        _ => {}
+    }
+}
+
+fn handle_event(
+    event: &Event,
+    watch_dir: &Path,
+    ignore_patterns: &[String],
+    filter_set: &Option<GlobSet>,
+    debouncer: &mut Debouncer,
+    rename_tracker: &mut RenameTracker,
+) {
+    for path in &event.paths {
+        if should_ignore(path, ignore_patterns) {
+            continue;
+        }
+        if !matches_filter(path, watch_dir, filter_set) {
+            continue;
+        }
+
+        handle_path_event(&event.kind, path, debouncer, rename_tracker);
+    }
+}
+
+fn run_watcher(
+    watch_dir: &Path,
+    recursive: bool,
+    debounce_ms: u64,
+    ignore_patterns: &[String],
+    filter_set: &Option<GlobSet>,
+) {
+    // `_watcher` must stay alive for the whole loop to keep receiving events.
+    let Some((_watcher, rx)) = create_watcher(watch_dir, recursive) else {
+        return;
+    };
 
     let mut debouncer = Debouncer::new(debounce_ms);
     let mut rename_tracker = RenameTracker::new();
 
     loop {
         match rx.recv_timeout(Duration::from_millis(50)) {
-            Ok(event) => {
-                for path in &event.paths {
-                    if should_ignore(path, ignore_patterns) {
-                        continue;
-                    }
-                    if !matches_filter(path, watch_dir, filter_set) {
-                        continue;
-                    }
-
-                    let timestamp = Utc::now().to_rfc3339();
-
-                    match event.kind {
-                        EventKind::Create(_) => {
-                            if let Some(old_path) = rename_tracker.on_create(path) {
-                                // This is a rename (remove followed by create)
-                                send_event(
-                                    "file_renamed",
-                                    serde_json::json!({
-                                        "old_path": old_path.to_string_lossy(),
-                                        "new_path": path.to_string_lossy(),
-                                        "timestamp": timestamp,
-                                    }),
-                                );
-                            } else {
-                                debouncer.add(
-                                    path.clone(),
-                                    "file_created".to_string(),
-                                    serde_json::json!({
-                                        "file_path": path.to_string_lossy(),
-                                        "timestamp": timestamp,
-                                    }),
-                                );
-                            }
-                        }
-                        EventKind::Modify(_) => {
-                            debouncer.add(
-                                path.clone(),
-                                "file_changed".to_string(),
-                                serde_json::json!({
-                                    "file_path": path.to_string_lossy(),
-                                    "timestamp": timestamp,
-                                }),
-                            );
-                        }
-                        EventKind::Remove(_) => {
-                            rename_tracker.on_remove(path.clone());
-                        }
-                        _ => {}
-                    }
-                }
-            }
+            Ok(event) => handle_event(
+                &event,
+                watch_dir,
+                ignore_patterns,
+                filter_set,
+                &mut debouncer,
+                &mut rename_tracker,
+            ),
             Err(std_mpsc::RecvTimeoutError::Timeout) => {}
             Err(std_mpsc::RecvTimeoutError::Disconnected) => break,
         }

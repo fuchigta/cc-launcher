@@ -6,8 +6,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::{Child, ChildStderr, ChildStdout, Command};
 use tokio::sync::{mpsc, RwLock};
+
+type PluginMap = Arc<RwLock<HashMap<String, PluginHandle>>>;
 
 struct PluginHandle {
     config: PluginConfig,
@@ -41,186 +43,30 @@ impl PluginManager {
     pub async fn start_plugin(&self, config: &PluginConfig) -> Result<(), String> {
         self.stop_plugin(&config.id).await.ok();
 
-        let exe_path = if config.executable.starts_with("sidecar:") {
-            let sidecar_name = &config.executable["sidecar:".len()..];
-            let bin_name = format!("plugins/{sidecar_name}{}", std::env::consts::EXE_SUFFIX);
+        let exe_path = self.resolve_executable(config)?;
 
-            // Try resource_dir first (production build)
-            let resource_path = self
-                .app_handle
-                .path()
-                .resource_dir()
-                .ok()
-                .map(|d| d.join(&bin_name));
-
-            if let Some(ref p) = resource_path {
-                if p.exists() {
-                    p.to_string_lossy().to_string()
-                } else {
-                    // Fallback: look in cargo target directory (dev mode)
-                    let dev_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("target/debug")
-                        .join(format!("{sidecar_name}{}", std::env::consts::EXE_SUFFIX));
-                    if dev_path.exists() {
-                        dev_path.to_string_lossy().to_string()
-                    } else {
-                        return Err(format!(
-                            "Sidecar binary not found: {} (tried {} and {})",
-                            sidecar_name,
-                            p.display(),
-                            dev_path.display()
-                        ));
-                    }
-                }
-            } else {
-                return Err(format!(
-                    "Failed to resolve resource dir for sidecar: {}",
-                    sidecar_name
-                ));
-            }
-        } else {
-            config.executable.clone()
-        };
-
-        let mut std_cmd = crate::windows_util::no_window_command(&exe_path);
-        for arg in &config.args {
-            std_cmd.arg(arg);
-        }
-
-        std_cmd.stdin(std::process::Stdio::piped());
-        std_cmd.stdout(std::process::Stdio::piped());
-        std_cmd.stderr(std::process::Stdio::piped());
-
-        let mut cmd = Command::from(std_cmd);
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| format!("Failed to spawn plugin {}: {}", config.name, e))?;
+        let mut child = spawn_plugin_process(config, &exe_path)?;
 
         let pid = child.id();
 
         // Send initialize request
-        let stdin = child.stdin.as_mut().ok_or("Failed to get stdin")?;
-        let init_request = JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: serde_json::Value::Number(1.into()),
-            method: "initialize".to_string(),
-            params: serde_json::json!({
-                "app_version": env!("CARGO_PKG_VERSION"),
-                "plugin_name": config.name,
-            }),
-        };
-        let mut msg = serde_json::to_string(&init_request).map_err(|e| e.to_string())?;
-        msg.push('\n');
-        stdin
-            .write_all(msg.as_bytes())
-            .await
-            .map_err(|e| format!("Failed to write init: {}", e))?;
-        stdin
-            .flush()
-            .await
-            .map_err(|e| format!("Failed to flush: {}", e))?;
+        send_initialize_request(&mut child, config).await?;
 
         // Read initialize response (with timeout)
         let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
         let mut reader = BufReader::new(stdout);
-        let mut line = String::new();
-
-        let read_result = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
-            reader.read_line(&mut line),
-        )
-        .await;
-
-        match read_result {
-            Ok(Ok(0)) => return Err("Plugin closed stdout before responding".to_string()),
-            Ok(Ok(_)) => {
-                let _response: JsonRpcResponse = serde_json::from_str(line.trim())
-                    .map_err(|e| format!("Invalid init response: {}", e))?;
-            }
-            Ok(Err(e)) => return Err(format!("Failed to read init response: {}", e)),
-            Err(_) => return Err("Plugin init timed out".to_string()),
-        }
+        read_initialize_response(&mut reader).await?;
 
         // Spawn stderr reader task
         let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
-        {
-            let plugins = self.plugins.clone();
-            let plugin_id = config.id.clone();
-            let mut stderr_reader = BufReader::new(stderr);
-            tokio::spawn(async move {
-                let mut buf = String::new();
-                loop {
-                    buf.clear();
-                    match stderr_reader.read_line(&mut buf).await {
-                        Ok(0) | Err(_) => break,
-                        Ok(_) => {
-                            let line = buf.trim().to_string();
-                            if !line.is_empty() {
-                                let mut handles = plugins.write().await;
-                                if let Some(handle) = handles.get_mut(&plugin_id) {
-                                    handle.last_stderr = Some(line);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
+        tokio::spawn(read_stderr_lines(
+            self.plugins.clone(),
+            config.id.clone(),
+            BufReader::new(stderr),
+        ));
 
         // Spawn stdout reader task
-        let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel();
-        let event_tx = self.event_tx.clone();
-        let plugin_name = config.name.clone();
-        let plugin_id = config.id.clone();
-        let plugins = self.plugins.clone();
-        let app_handle = self.app_handle.clone();
-        let plugin_config = config.clone();
-
-        tokio::spawn(async move {
-            loop {
-                let mut buf = String::new();
-                tokio::select! {
-                    _ = &mut shutdown_rx => {
-                        break;
-                    }
-                    result = reader.read_line(&mut buf) => {
-                        match result {
-                            Ok(0) | Err(_) => {
-                                let mut handles = plugins.write().await;
-                                if let Some(handle) = handles.get_mut(&plugin_id) {
-                                    handle.running = false;
-                                    handle.error = Some("Process exited".to_string());
-                                }
-                                drop(handles);
-                                let _ = app_handle.emit("plugin-status-changed", &plugin_id);
-                                eprintln!("Plugin {} exited", plugin_config.name);
-                                break;
-                            }
-                            Ok(_) => {
-                                let trimmed = buf.trim();
-                                if trimmed.is_empty() {
-                                    continue;
-                                }
-                                let notification = match serde_json::from_str::<JsonRpcNotification>(trimmed) {
-                                    Ok(n) if n.method == "event" => n,
-                                    _ => continue,
-                                };
-                                let event = match serde_json::from_value::<PluginEvent>(notification.params) {
-                                    Ok(e) => e,
-                                    Err(_) => continue,
-                                };
-                                let mut handles = plugins.write().await;
-                                if let Some(handle) = handles.get_mut(&plugin_id) {
-                                    handle.last_event_at = Some(Utc::now());
-                                }
-                                drop(handles);
-                                let _ = event_tx.send((plugin_id.clone(), plugin_name.clone(), event)).await;
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        let shutdown_tx = self.spawn_stdout_reader(config, reader);
 
         let handle = PluginHandle {
             config: config.clone(),
@@ -239,6 +85,79 @@ impl PluginManager {
         let _ = self.app_handle.emit("plugin-status-changed", &config.id);
 
         Ok(())
+    }
+
+    /// Resolve the executable path, expanding `sidecar:<name>` to the bundled binary.
+    fn resolve_executable(&self, config: &PluginConfig) -> Result<String, String> {
+        if config.executable.starts_with("sidecar:") {
+            let sidecar_name = &config.executable["sidecar:".len()..];
+            self.resolve_sidecar_path(sidecar_name)
+        } else {
+            Ok(config.executable.clone())
+        }
+    }
+
+    fn resolve_sidecar_path(&self, sidecar_name: &str) -> Result<String, String> {
+        let bin_name = format!("plugins/{sidecar_name}{}", std::env::consts::EXE_SUFFIX);
+
+        // Try resource_dir first (production build)
+        let resource_path = self
+            .app_handle
+            .path()
+            .resource_dir()
+            .ok()
+            .map(|d| d.join(&bin_name));
+
+        let Some(ref p) = resource_path else {
+            return Err(format!(
+                "Failed to resolve resource dir for sidecar: {}",
+                sidecar_name
+            ));
+        };
+        if p.exists() {
+            return Ok(p.to_string_lossy().to_string());
+        }
+
+        // Fallback: look in cargo target directory (dev mode)
+        let dev_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target/debug")
+            .join(format!("{sidecar_name}{}", std::env::consts::EXE_SUFFIX));
+        if dev_path.exists() {
+            Ok(dev_path.to_string_lossy().to_string())
+        } else {
+            Err(format!(
+                "Sidecar binary not found: {} (tried {} and {})",
+                sidecar_name,
+                p.display(),
+                dev_path.display()
+            ))
+        }
+    }
+
+    /// Spawn the stdout reader task and return the sender that stops it.
+    fn spawn_stdout_reader(
+        &self,
+        config: &PluginConfig,
+        reader: BufReader<ChildStdout>,
+    ) -> tokio::sync::oneshot::Sender<()> {
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+        let event_tx = self.event_tx.clone();
+        let plugin_name = config.name.clone();
+        let plugin_id = config.id.clone();
+        let plugins = self.plugins.clone();
+        let app_handle = self.app_handle.clone();
+
+        tokio::spawn(read_stdout_events(
+            reader,
+            shutdown_rx,
+            event_tx,
+            plugin_id,
+            plugin_name,
+            plugins,
+            app_handle,
+        ));
+
+        shutdown_tx
     }
 
     pub async fn stop_plugin(&self, id: &str) -> Result<(), String> {
@@ -318,4 +237,164 @@ impl PluginManager {
             let _ = self.stop_plugin(&id).await;
         }
     }
+}
+
+fn spawn_plugin_process(config: &PluginConfig, exe_path: &str) -> Result<Child, String> {
+    let mut std_cmd = crate::windows_util::no_window_command(exe_path);
+    for arg in &config.args {
+        std_cmd.arg(arg);
+    }
+
+    std_cmd.stdin(std::process::Stdio::piped());
+    std_cmd.stdout(std::process::Stdio::piped());
+    std_cmd.stderr(std::process::Stdio::piped());
+
+    let mut cmd = Command::from(std_cmd);
+    cmd.spawn()
+        .map_err(|e| format!("Failed to spawn plugin {}: {}", config.name, e))
+}
+
+async fn send_initialize_request(child: &mut Child, config: &PluginConfig) -> Result<(), String> {
+    let stdin = child.stdin.as_mut().ok_or("Failed to get stdin")?;
+    let init_request = JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: serde_json::Value::Number(1.into()),
+        method: "initialize".to_string(),
+        params: serde_json::json!({
+            "app_version": env!("CARGO_PKG_VERSION"),
+            "plugin_name": config.name,
+        }),
+    };
+    let mut msg = serde_json::to_string(&init_request).map_err(|e| e.to_string())?;
+    msg.push('\n');
+    stdin
+        .write_all(msg.as_bytes())
+        .await
+        .map_err(|e| format!("Failed to write init: {}", e))?;
+    stdin
+        .flush()
+        .await
+        .map_err(|e| format!("Failed to flush: {}", e))?;
+    Ok(())
+}
+
+async fn read_initialize_response(reader: &mut BufReader<ChildStdout>) -> Result<(), String> {
+    let mut line = String::new();
+
+    let read_result = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        reader.read_line(&mut line),
+    )
+    .await;
+
+    match read_result {
+        Ok(Ok(0)) => Err("Plugin closed stdout before responding".to_string()),
+        Ok(Ok(_)) => {
+            let _response: JsonRpcResponse = serde_json::from_str(line.trim())
+                .map_err(|e| format!("Invalid init response: {}", e))?;
+            Ok(())
+        }
+        Ok(Err(e)) => Err(format!("Failed to read init response: {}", e)),
+        Err(_) => Err("Plugin init timed out".to_string()),
+    }
+}
+
+/// Keep the latest non-empty stderr line of the plugin in its handle.
+async fn read_stderr_lines(
+    plugins: PluginMap,
+    plugin_id: String,
+    mut stderr_reader: BufReader<ChildStderr>,
+) {
+    let mut buf = String::new();
+    loop {
+        buf.clear();
+        match stderr_reader.read_line(&mut buf).await {
+            Ok(0) | Err(_) => break,
+            Ok(_) => record_stderr_line(&plugins, &plugin_id, buf.trim().to_string()).await,
+        }
+    }
+}
+
+async fn record_stderr_line(plugins: &PluginMap, plugin_id: &str, line: String) {
+    if !line.is_empty() {
+        let mut handles = plugins.write().await;
+        if let Some(handle) = handles.get_mut(plugin_id) {
+            handle.last_stderr = Some(line);
+        }
+    }
+}
+
+/// Forward plugin events from stdout until shutdown is signaled or the process exits.
+async fn read_stdout_events(
+    mut reader: BufReader<ChildStdout>,
+    mut shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+    event_tx: mpsc::Sender<(String, String, PluginEvent)>,
+    plugin_id: String,
+    plugin_name: String,
+    plugins: PluginMap,
+    app_handle: tauri::AppHandle,
+) {
+    loop {
+        let mut buf = String::new();
+        tokio::select! {
+            _ = &mut shutdown_rx => {
+                break;
+            }
+            result = reader.read_line(&mut buf) => {
+                match result {
+                    Ok(0) | Err(_) => {
+                        mark_plugin_exited(&plugins, &plugin_id, &plugin_name, &app_handle).await;
+                        break;
+                    }
+                    Ok(_) => {
+                        handle_stdout_line(buf.trim(), &plugins, &plugin_id, &plugin_name, &event_tx).await;
+                    }
+                }
+            }
+        }
+    }
+}
+
+async fn mark_plugin_exited(
+    plugins: &PluginMap,
+    plugin_id: &str,
+    plugin_name: &str,
+    app_handle: &tauri::AppHandle,
+) {
+    let mut handles = plugins.write().await;
+    if let Some(handle) = handles.get_mut(plugin_id) {
+        handle.running = false;
+        handle.error = Some("Process exited".to_string());
+    }
+    drop(handles);
+    let _ = app_handle.emit("plugin-status-changed", plugin_id);
+    eprintln!("Plugin {} exited", plugin_name);
+}
+
+async fn handle_stdout_line(
+    trimmed: &str,
+    plugins: &PluginMap,
+    plugin_id: &str,
+    plugin_name: &str,
+    event_tx: &mpsc::Sender<(String, String, PluginEvent)>,
+) {
+    if trimmed.is_empty() {
+        return;
+    }
+    let notification = match serde_json::from_str::<JsonRpcNotification>(trimmed) {
+        Ok(n) if n.method == "event" => n,
+        _ => return,
+    };
+    let event = match serde_json::from_value::<PluginEvent>(notification.params) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    let mut handles = plugins.write().await;
+    if let Some(handle) = handles.get_mut(plugin_id) {
+        handle.last_event_at = Some(Utc::now());
+    }
+    drop(handles);
+    let _ = event_tx
+        .send((plugin_id.to_string(), plugin_name.to_string(), event))
+        .await;
 }

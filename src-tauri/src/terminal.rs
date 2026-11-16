@@ -24,15 +24,61 @@ fn get_wt_settings_path() -> Option<PathBuf> {
     }
 }
 
+/// Windows Terminalの設定ファイルを読み込んでJSONとしてパース
+fn load_wt_settings() -> Option<Value> {
+    let settings_path = get_wt_settings_path()?;
+    let content = fs::read_to_string(&settings_path).ok()?;
+    serde_json::from_str::<Value>(&content).ok()
+}
+
+/// プロファイルが既定プロファイル（guid または name で一致）かどうか
+fn is_default_profile(profile: &Value, default_profile: &str) -> bool {
+    let guid = profile.get("guid").and_then(|v| v.as_str());
+    let name = profile.get("name").and_then(|v| v.as_str());
+    guid == Some(default_profile) || name == Some(default_profile)
+}
+
+/// sourceでシェル種類を判定（判定できなければNone）
+fn shell_from_source(source: &str) -> Option<TerminalType> {
+    if source.contains("WSL") || source.contains("wsl") {
+        return Some(TerminalType::Wsl);
+    }
+    if source.contains("PowerShell") {
+        return Some(TerminalType::Pwsh);
+    }
+    None
+}
+
+/// commandlineでシェル種類を判定（判定できなければNone）
+fn shell_from_commandline(commandline: &str) -> Option<TerminalType> {
+    let lower = commandline.to_lowercase();
+    if lower.contains("wsl") {
+        Some(TerminalType::Wsl)
+    } else if lower.contains("pwsh") {
+        Some(TerminalType::Pwsh)
+    } else if lower.contains("powershell") || lower.contains("cmd") {
+        Some(TerminalType::PowerShell)
+    } else {
+        None
+    }
+}
+
+/// プロファイルのシェル種類を判定（source → commandline の順、判定できなければNone）
+fn shell_from_profile(profile: &Value) -> Option<TerminalType> {
+    // sourceでWSLを判定
+    if let Some(source) = profile.get("source").and_then(|v| v.as_str()) {
+        if let Some(shell) = shell_from_source(source) {
+            return Some(shell);
+        }
+    }
+    // commandlineで判定
+    let commandline = profile.get("commandline").and_then(|v| v.as_str())?;
+    shell_from_commandline(commandline)
+}
+
 /// 既定プロファイルのシェル種類を検出
 fn detect_wt_default_shell() -> TerminalType {
-    let Some(settings_path) = get_wt_settings_path() else {
-        return TerminalType::PowerShell;
-    };
-    let Ok(content) = fs::read_to_string(&settings_path) else {
-        return TerminalType::PowerShell;
-    };
-    let Ok(settings) = serde_json::from_str::<Value>(&content) else {
+    let Some(settings) = load_wt_settings() else {
         return TerminalType::PowerShell;
     };
 
@@ -48,30 +94,11 @@ fn detect_wt_default_shell() -> TerminalType {
     };
 
     for profile in profiles {
-        let guid = profile.get("guid").and_then(|v| v.as_str());
-        let name = profile.get("name").and_then(|v| v.as_str());
-
-        if guid == Some(default_profile) || name == Some(default_profile) {
-            // sourceでWSLを判定
-            if let Some(source) = profile.get("source").and_then(|v| v.as_str()) {
-                if source.contains("WSL") || source.contains("wsl") {
-                    return TerminalType::Wsl;
-                }
-                if source.contains("PowerShell") {
-                    return TerminalType::Pwsh;
-                }
-            }
-            // commandlineで判定
-            if let Some(commandline) = profile.get("commandline").and_then(|v| v.as_str()) {
-                let lower = commandline.to_lowercase();
-                if lower.contains("wsl") {
-                    return TerminalType::Wsl;
-                } else if lower.contains("pwsh") {
-                    return TerminalType::Pwsh;
-                } else if lower.contains("powershell") || lower.contains("cmd") {
-                    return TerminalType::PowerShell;
-                }
-            }
+        if !is_default_profile(profile, default_profile) {
+            continue;
+        }
+        if let Some(shell) = shell_from_profile(profile) {
+            return shell;
         }
     }
 

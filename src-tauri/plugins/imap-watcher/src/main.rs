@@ -292,6 +292,126 @@ fn fetch_and_process_new_mails(
 
 // --- Watch loop ---
 
+/// Sleep for the current backoff, then double it (capped at 300s).
+fn sleep_and_increase_backoff(backoff: &mut u64) {
+    std::thread::sleep(Duration::from_secs(*backoff));
+    *backoff = (*backoff * 2).min(300);
+}
+
+/// Connect and fetch the existing UIDs. On failure, logs, sleeps with backoff
+/// and returns `None` so the caller retries.
+fn open_session(
+    cli: &Cli,
+    password: &str,
+    backoff: &mut u64,
+) -> Option<(Session<TlsStream<std::net::TcpStream>>, HashSet<u32>)> {
+    let mut session = match connect_imap(&cli.server, cli.port, &cli.user, password) {
+        Ok(s) => {
+            *backoff = 1;
+            s
+        }
+        Err(e) => {
+            eprintln!("Connection failed: {}. Retrying in {}s...", e, *backoff);
+            sleep_and_increase_backoff(backoff);
+            return None;
+        }
+    };
+
+    // Get existing UIDs (don't fire events for these)
+    let known_uids = match get_existing_uids(&mut session, &cli.folder) {
+        Ok(uids) => {
+            eprintln!(
+                "Connected. Monitoring {} ({} existing messages)",
+                cli.folder,
+                uids.len()
+            );
+            uids
+        }
+        Err(e) => {
+            eprintln!("Failed to get existing UIDs: {}", e);
+            let _ = session.logout();
+            sleep_and_increase_backoff(backoff);
+            return None;
+        }
+    };
+
+    Some((session, known_uids))
+}
+
+/// Check if server supports IDLE and log the chosen watch mode.
+fn detect_idle_support(session: &mut Session<TlsStream<std::net::TcpStream>>, cli: &Cli) -> bool {
+    let has_idle = session
+        .capabilities()
+        .map(|caps| caps.has_str("IDLE"))
+        .unwrap_or(false);
+
+    if has_idle {
+        eprintln!("Using IDLE for real-time notifications");
+    } else {
+        eprintln!("IDLE not supported, polling every {}s", cli.poll_interval);
+    }
+
+    has_idle
+}
+
+/// Use IDLE - wait for server notification. Returns `false` if the session must reconnect.
+fn wait_with_idle(session: &mut Session<TlsStream<std::net::TcpStream>>, cli: &Cli) -> bool {
+    let idle_handle = match session.idle() {
+        Ok(h) => h,
+        Err(e) => {
+            eprintln!("IDLE setup failed: {}. Reconnecting...", e);
+            return false;
+        }
+    };
+
+    // Wait for IDLE response (timeout after poll_interval to periodically check)
+    // Handle is dropped after wait, returning control to session
+    if let Err(e) = idle_handle.wait_with_timeout(Duration::from_secs(cli.poll_interval)) {
+        eprintln!("IDLE wait failed: {}. Reconnecting...", e);
+        return false;
+    }
+    true
+}
+
+/// Sleep for poll_interval, then re-select. Returns `false` if the session must reconnect.
+fn wait_with_polling(session: &mut Session<TlsStream<std::net::TcpStream>>, cli: &Cli) -> bool {
+    std::thread::sleep(Duration::from_secs(cli.poll_interval));
+
+    // Re-select folder to refresh
+    if let Err(e) = session.select(&cli.folder) {
+        eprintln!("Select failed: {}. Reconnecting...", e);
+        return false;
+    }
+    true
+}
+
+/// Main watch loop for one session. Returns when the session must reconnect.
+fn watch_session(
+    session: &mut Session<TlsStream<std::net::TcpStream>>,
+    known_uids: &mut HashSet<u32>,
+    cli: &Cli,
+    has_idle: bool,
+    subject_re: &Option<Regex>,
+    body_re: &Option<Regex>,
+) {
+    loop {
+        let ready = if has_idle {
+            wait_with_idle(session, cli)
+        } else {
+            wait_with_polling(session, cli)
+        };
+        if !ready {
+            break;
+        }
+
+        // Check for new mail
+        if let Err(e) = fetch_and_process_new_mails(session, known_uids, subject_re, body_re) {
+            eprintln!("Fetch failed: {}. Reconnecting...", e);
+            break;
+        }
+    }
+}
+
 fn run_imap_watcher(
     cli: &Cli,
     password: &str,
@@ -303,93 +423,24 @@ fn run_imap_watcher(
     loop {
         eprintln!("Connecting to {}:{}...", cli.server, cli.port);
 
-        let mut session = match connect_imap(&cli.server, cli.port, &cli.user, password) {
-            Ok(s) => {
-                backoff = 1;
-                s
-            }
-            Err(e) => {
-                eprintln!("Connection failed: {}. Retrying in {}s...", e, backoff);
-                std::thread::sleep(Duration::from_secs(backoff));
-                backoff = (backoff * 2).min(300);
-                continue;
-            }
+        let Some((mut session, mut known_uids)) = open_session(cli, password, &mut backoff) else {
+            continue;
         };
 
-        // Get existing UIDs (don't fire events for these)
-        let mut known_uids = match get_existing_uids(&mut session, &cli.folder) {
-            Ok(uids) => {
-                eprintln!(
-                    "Connected. Monitoring {} ({} existing messages)",
-                    cli.folder,
-                    uids.len()
-                );
-                uids
-            }
-            Err(e) => {
-                eprintln!("Failed to get existing UIDs: {}", e);
-                let _ = session.logout();
-                std::thread::sleep(Duration::from_secs(backoff));
-                backoff = (backoff * 2).min(300);
-                continue;
-            }
-        };
+        let has_idle = detect_idle_support(&mut session, cli);
 
-        // Check if server supports IDLE
-        let has_idle = session
-            .capabilities()
-            .map(|caps| caps.has_str("IDLE"))
-            .unwrap_or(false);
-
-        if has_idle {
-            eprintln!("Using IDLE for real-time notifications");
-        } else {
-            eprintln!("IDLE not supported, polling every {}s", cli.poll_interval);
-        }
-
-        // Main watch loop
-        loop {
-            if has_idle {
-                // Use IDLE - wait for server notification
-                let idle_handle = match session.idle() {
-                    Ok(h) => h,
-                    Err(e) => {
-                        eprintln!("IDLE setup failed: {}. Reconnecting...", e);
-                        break;
-                    }
-                };
-
-                // Wait for IDLE response (timeout after poll_interval to periodically check)
-                // Handle is dropped after wait, returning control to session
-                if let Err(e) =
-                    idle_handle.wait_with_timeout(Duration::from_secs(cli.poll_interval))
-                {
-                    eprintln!("IDLE wait failed: {}. Reconnecting...", e);
-                    break;
-                }
-            } else {
-                std::thread::sleep(Duration::from_secs(cli.poll_interval));
-
-                // Re-select folder to refresh
-                if let Err(e) = session.select(&cli.folder) {
-                    eprintln!("Select failed: {}. Reconnecting...", e);
-                    break;
-                }
-            }
-
-            // Check for new mail
-            if let Err(e) =
-                fetch_and_process_new_mails(&mut session, &mut known_uids, subject_re, body_re)
-            {
-                eprintln!("Fetch failed: {}. Reconnecting...", e);
-                break;
-            }
-        }
+        watch_session(
+            &mut session,
+            &mut known_uids,
+            cli,
+            has_idle,
+            subject_re,
+            body_re,
+        );
 
         let _ = session.logout();
         eprintln!("Reconnecting in {}s...", backoff);
-        std::thread::sleep(Duration::from_secs(backoff));
-        backoff = (backoff * 2).min(300);
+        sleep_and_increase_backoff(&mut backoff);
     }
 }
 
