@@ -52,3 +52,6 @@ windows = { version = "0.61", features = [
 name = "cc-launcher-cli"
 path = "src/bin/cli.rs"
 
+[dev-dependencies]
+proptest = "=1.12.0"
+
