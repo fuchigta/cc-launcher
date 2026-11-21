@@ -253,4 +253,77 @@ mod tests {
             "0 0 9 1,15 * *"
         );
     }
+
+    mod props {
+        use super::super::*;
+        use proptest::collection::vec;
+        use proptest::prelude::*;
+
+        /// A single non-empty cron-like field (no whitespace inside).
+        fn cron_field() -> impl Strategy<Value = String> {
+            "[0-9A-Z*/,?-]{1,6}"
+        }
+
+        /// `n` cron fields joined by a run of spaces/tabs.
+        fn cron_expr(n: usize) -> impl Strategy<Value = String> {
+            (vec(cron_field(), n), "[ \t]{1,3}").prop_map(|(fields, sep)| fields.join(&sep))
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(64))]
+
+            #[test]
+            fn parse_daily_time_roundtrip(h in 0u32..=23, m in 0u32..=59) {
+                let plain = format!("{h}:{m}");
+                let padded = format!("{h:02}:{m:02}");
+                prop_assert_eq!(parse_daily_time(&plain), Ok((h, m)));
+                prop_assert_eq!(parse_daily_time(&padded), Ok((h, m)));
+            }
+
+            #[test]
+            fn parse_daily_time_rejects_hour_out_of_range(h in 24u32.., m in 0u32..=59) {
+                let input = format!("{h}:{m}");
+                prop_assert!(parse_daily_time(&input).is_err());
+            }
+
+            #[test]
+            fn parse_daily_time_rejects_minute_out_of_range(h in 0u32..=23, m in 60u32..) {
+                let input = format!("{h}:{m}");
+                prop_assert!(parse_daily_time(&input).is_err());
+            }
+
+            #[test]
+            fn parse_daily_time_rejects_wrong_part_count(
+                parts in vec(0u32..=23, 0..6).prop_filter("not exactly 2 parts", |p| p.len() != 2)
+            ) {
+                let joined: Vec<String> = parts.iter().map(u32::to_string).collect();
+                prop_assert!(parse_daily_time(&joined.join(":")).is_err());
+            }
+
+            #[test]
+            fn normalize_5_fields_prepends_seconds(expr in cron_expr(5)) {
+                prop_assert_eq!(normalize_cron_expression(&expr), Ok(format!("0 {expr}")));
+            }
+
+            #[test]
+            fn normalize_6_fields_is_unchanged(expr in cron_expr(6)) {
+                prop_assert_eq!(normalize_cron_expression(&expr), Ok(expr));
+            }
+
+            #[test]
+            fn normalize_is_idempotent(expr in (5usize..=6).prop_flat_map(cron_expr)) {
+                let once = normalize_cron_expression(&expr).unwrap();
+                prop_assert_eq!(normalize_cron_expression(&once), Ok(once.clone()));
+            }
+
+            #[test]
+            fn normalize_rejects_other_field_counts(
+                expr in (0usize..12)
+                    .prop_filter("not 5 or 6 fields", |n| *n != 5 && *n != 6)
+                    .prop_flat_map(cron_expr)
+            ) {
+                prop_assert!(normalize_cron_expression(&expr).is_err());
+            }
+        }
+    }
 }

@@ -173,4 +173,78 @@ mod tests {
         assert!(config.last_directory.is_none());
         assert!(config.recent_directories.is_empty());
     }
+
+    mod props {
+        use super::super::*;
+        use proptest::collection::vec;
+        use proptest::option;
+        use proptest::prelude::*;
+
+        fn terminal_type() -> impl Strategy<Value = TerminalType> {
+            prop_oneof![
+                Just(TerminalType::Auto),
+                Just(TerminalType::Pwsh),
+                Just(TerminalType::PowerShell),
+                Just(TerminalType::Wsl),
+            ]
+        }
+
+        fn wsl_shell() -> impl Strategy<Value = WslShell> {
+            prop_oneof![
+                Just(WslShell::Bash),
+                Just(WslShell::Zsh),
+                Just(WslShell::Sh),
+            ]
+        }
+
+        fn directories() -> impl Strategy<Value = (Option<String>, Vec<String>)> {
+            (option::of(any::<String>()), vec(any::<String>(), 0..4))
+        }
+
+        /// `AppConfig::default()` with the scalar / directory fields varied.
+        /// schedules / plugins / subscriptions stay empty here; their serde
+        /// round-trip is covered by the property tests in `models.rs`.
+        fn app_config() -> impl Strategy<Value = AppConfig> {
+            (
+                (any::<String>(), terminal_type(), wsl_shell()),
+                directories(),
+                directories(),
+                (any::<u64>(), any::<bool>(), any::<bool>()),
+            )
+                .prop_map(|((shortcut, terminal, wsl_shell), win, wsl, flags)| {
+                    AppConfig {
+                        shortcut,
+                        terminal,
+                        wsl_shell,
+                        last_directory: win.0,
+                        recent_directories: win.1,
+                        wsl_directory: wsl.0,
+                        wsl_recent_directories: wsl.1,
+                        timeout_secs: flags.0,
+                        enable_on_startup: flags.1,
+                        enable_context_menu: flags.2,
+                        ..AppConfig::default()
+                    }
+                })
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(64))]
+
+            /// `AppConfig` has no `PartialEq`, so equality is checked on the
+            /// `serde_json::Value` of the original vs. the restored config,
+            /// plus the `PartialEq` enum fields directly.
+            #[test]
+            fn app_config_roundtrip(config in app_config()) {
+                let json = serde_json::to_string(&config).unwrap();
+                let restored: AppConfig = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(&restored.terminal, &config.terminal);
+                prop_assert_eq!(&restored.wsl_shell, &config.wsl_shell);
+                prop_assert_eq!(
+                    serde_json::to_value(&restored).unwrap(),
+                    serde_json::to_value(&config).unwrap()
+                );
+            }
+        }
+    }
 }

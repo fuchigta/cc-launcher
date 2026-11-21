@@ -144,4 +144,107 @@ mod tests {
             r#"User: <data key="user">{"id":1,"name":"test"}</data>"#
         );
     }
+
+    mod props {
+        use super::super::*;
+        use proptest::collection::{btree_map, vec};
+        use proptest::prelude::*;
+        use serde_json::Value;
+
+        // Template text and keys exclude `{` / `}` so that the only `{{key}}`
+        // occurrences in a generated template are the ones the test inserts.
+        // Arbitrary braces could form placeholders by accident, which would
+        // make the expected output depend on the input in ways unrelated to
+        // the property being checked.
+        fn text() -> impl Strategy<Value = String> {
+            "[^{}]{0,12}"
+        }
+
+        fn key() -> impl Strategy<Value = String> {
+            "[^{}]{0,8}"
+        }
+
+        fn placeholder(key: &str) -> String {
+            format!("{{{{{key}}}}}")
+        }
+
+        fn single_entry(key: &str, value: String) -> Value {
+            let mut map = serde_json::Map::new();
+            map.insert(key.to_string(), Value::String(value));
+            Value::Object(map)
+        }
+
+        fn non_object_json() -> impl Strategy<Value = Value> {
+            prop_oneof![
+                Just(Value::Null),
+                any::<bool>().prop_map(Value::from),
+                any::<i64>().prop_map(Value::from),
+                any::<String>().prop_map(Value::from),
+                vec(any::<String>(), 0..4).prop_map(Value::from),
+            ]
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(64))]
+
+            /// Every placeholder for a present key becomes exactly the `<data>` element;
+            /// the value is inserted verbatim (any string, braces included).
+            #[test]
+            fn present_key_expands_exactly(
+                segments in vec(text(), 1..5),
+                key in key(),
+                value in any::<String>(),
+            ) {
+                let template = segments.join(&placeholder(&key));
+                let replacement = format!("<data key=\"{key}\">{value}</data>");
+                let data = single_entry(&key, value);
+                prop_assert_eq!(expand_template(&template, &data), segments.join(&replacement));
+            }
+
+            /// No `{{key}}` remains for a present key. The value is brace-free here because
+            /// values are inserted without escaping, so a value that itself contains
+            /// `{{key}}` would (by design) reappear in the output.
+            #[test]
+            fn present_key_leaves_no_placeholder(
+                segments in vec(text(), 2..5),
+                key in key(),
+                value in text(),
+            ) {
+                let template = segments.join(&placeholder(&key));
+                let data = single_entry(&key, value);
+                let result = expand_template(&template, &data);
+                prop_assert!(!result.contains(&placeholder(&key)));
+            }
+
+            #[test]
+            fn missing_key_placeholder_is_kept(
+                segments in vec(text(), 2..5),
+                (present, missing) in (key(), key()).prop_filter("distinct keys", |(a, b)| a != b),
+                value in any::<String>(),
+            ) {
+                let template = segments.join(&placeholder(&missing));
+                let data = single_entry(&present, value);
+                prop_assert_eq!(expand_template(&template, &data), template);
+            }
+
+            #[test]
+            fn template_without_placeholder_is_unchanged(
+                template in any::<String>().prop_filter("no `{{`", |t| !t.contains("{{")),
+                data in btree_map(any::<String>(), any::<String>(), 0..4),
+            ) {
+                let data = serde_json::to_value(data).unwrap();
+                prop_assert_eq!(expand_template(&template, &data), template);
+            }
+
+            #[test]
+            fn non_object_data_leaves_template_unchanged(
+                segments in vec(text(), 1..5),
+                key in key(),
+                data in non_object_json(),
+            ) {
+                let template = segments.join(&placeholder(&key));
+                prop_assert_eq!(expand_template(&template, &data), template);
+            }
+        }
+    }
 }
