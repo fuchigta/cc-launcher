@@ -1,0 +1,13 @@
+{
+  "threshold": 3.3,
+  "ignore": [
+    "src/__tests__/**",
+    "src-tauri/bindings/**",
+    ".claude/**",
+    "skills/**",
+    "docs/**",
+    "CHANGELOG.md",
+    "pnpm-lock.yaml"
+  ],
+  "reporters": ["console"]
+}
