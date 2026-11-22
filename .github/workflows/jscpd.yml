@@ -1,0 +1,46 @@
+name: jscpd
+
+# コピー＆ペーストによる重複が増えていないかを確かめる。jscpd は package.json の依存に
+# 入れず、npx の版指定で固定する。設定は .jscpd.json にあり、JSON にはコメントを
+# 書けないので設定の根拠はここに残す。
+#
+# - 版: jscpd 5.4.3（Rust エンジン）。Rust・TypeScript・TSX の両方を測る
+# - 検出の基準: 既定値（min-tokens 50・min-lines 5・mode mild）で exact のみ。
+#   .gitignore は既定で除外される（src-tauri/target/ など）
+# - 実測（2026-11-22）: 58 ファイル・18 クローン、重複率は行 2.77%・トークン 2.69%（この jscpd.yml を含む）
+#   - 主なクローン: src-tauri/plugins の folder-watcher と imap-watcher の main.rs 同士
+#     （3 件・105 行）、src-tauri/src/terminal.rs 内（3 件）、src/manager の
+#     Schedule* と Subscription* のフォーム・タブ同士（3 件）、ci.yml と release.yml（2 件）
+#   - Rust のテストは #[cfg(test)] で同じファイルにあるためパスでは外せず、測定に含まれる
+#     （現状テストモジュール内のクローンは headless.rs と terminal.rs の 1 件・6 行のみ）
+# - threshold: 行の重複率と比べられ、超えたときだけ失敗する（2.78 では通り 2.77 では
+#   落ちることを確認済み）。実測に約 0.5 ポイントの余裕を持たせて 3.3 に置くラチェットとして
+#   扱い、重複を減らして実測が下がったら threshold も引き下げる
+# - ignore（除外しないと 89 ファイル・46 クローン・行 5.20%・トークン 4.58%）:
+#   - src/__tests__/: Vitest のテストは性質上似た形が並び、ゲートで見たいのは本番コードの
+#     重複であるため外す（除外なしの 46 クローンのうち 19 件がテスト同士）
+#   - src-tauri/bindings/: ts-rs の生成物のため外す（除外しなくても jscpd は 13 ファイル中
+#     2 ファイルしか測らずクローンも無いが、生成物なので明示的に外す）
+#   - CHANGELOG.md（git-cliff の生成物）、pnpm-lock.yaml（pnpm の生成物）: 生成物のため外す
+#   - .claude/, skills/: プロンプト・スキル類で製品コードではないため外す
+#   - docs/: Markdown のコードブロックが測定に入り、docs/cli.md と
+#     skills/cc-launcher-cli/SKILL.md の CLI 説明の写しなど 9 件のクローンとして出るため外す
+#   - 手元で測るときは --ignore を渡さず .jscpd.json を使う。CLI の --ignore は .jscpd.json の
+#     ignore に足されるのではなく置き換えるため、数値がずれる
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  jscpd:
+    name: jscpd
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: jscpd
+        run: npx --yes jscpd@5.4.3 --no-tips --no-colors .
