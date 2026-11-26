@@ -1,0 +1,18 @@
+# cargo-mutants（ミューテーションテスト）の設定。CI は .github/workflows/mutation.yml、
+# 回し方は CLAUDE.md の「ミューテーションテスト」を参照。
+# cargo-mutants はワークスペースの根（src-tauri/）でこのファイルを読む。パスも src-tauri/ からの相対。
+#
+# 対象は純粋なロジックでテストが厚いファイルだけに絞る（時刻パース・cron 正規化・テンプレート展開、
+# serde の往復、サブスクリプションの判定。proptest の性質も入っている）。
+# - windows_util.rs などの Windows API、Tauri コマンドの配線、実プロセス・実ファイルに触る部分は外す
+# - 対象を変えたら mutation.yml の paths も合わせて直す
+# - #[cfg(test)] のモジュールは cargo-mutants が自動で外す
+examine_globs = ["src/scheduler.rs", "src/config.rs", "src/models.rs", "src/subscription.rs"]
+
+# 変異させたクレート（cc-launcher）のテストだけを回す。プラグインのクレートにテストは無く、
+# ワークスペース全体のテストに広がらないよう明示する。
+test_package = ["cc-launcher"]
+
+# テストは cargo-nextest で回す（テストごとに別プロセスで並列に走り、最初の失敗で止まる）。
+# 対象のファイルに doctest は無い（nextest は doctest を回さない）。
+test_tool = "nextest"
