@@ -165,6 +165,16 @@ fn normalize_cron_expression(expr: &str) -> Result<String, String> {
     }
 }
 
+// PROBE（ゲートの検証用の一時変更、revert する）
+#[allow(dead_code)]
+fn retry_delay_secs(attempt: u32) -> u32 {
+    if attempt >= 3 {
+        60
+    } else {
+        attempt * 10
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
