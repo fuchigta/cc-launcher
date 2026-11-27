@@ -13,5 +13,4 @@ if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2
   base="HEAD^"
 fi
 echo "比較元: $(git rev-parse "$base")" >&2
-# PROBE（計測用の一時変更、revert する）: 空の木と比べて対象の全件を試す
-git diff --relative=src-tauri "$(git hash-object -t tree /dev/null)" HEAD
+git diff --relative=src-tauri "${base}...HEAD"
