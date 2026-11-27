@@ -28,6 +28,8 @@ name: Mutation
 # - 44 件中 caught 18・missed 22・unviable 4、スコア 45.0%。シャード 1 本の所要は 7〜10 分
 # - 内訳: 未変異のビルド 160〜230 秒（キャッシュなし）、1 件あたりビルド約 25 秒＋テスト約 2 秒。
 #   1 本で全件を回すと約 23 分
+# - キャッシュが効いた 2 回目以降は未変異のビルドが約 55 秒。差分 5 件（1 シャード）でジョブ約 4 分、
+#   22 件（3 シャード）で各 4〜6 分
 # - 生き残り 22 件に等価なミュータントは無く、すべてテストの穴。
 #   SubscriptionEngine::process_event の照合（enabled・plugin 名・イベント種別。AppHandle が要るため
 #   テストが無い）13 件、SubscriptionEngine::reload 1 件、config.rs の serde 既定値
