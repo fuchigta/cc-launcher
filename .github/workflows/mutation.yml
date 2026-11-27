@@ -24,7 +24,23 @@ name: Mutation
 # - シャード: 10 件ごとに 1 つ、最大 4 つ（round-robin）。cargo-mutants の文書はシャードあたり
 #   10 件以上を勧めている。所要時間は下の計測を参照
 #
-# ゲート（MAX_MISSED）の根拠: 計測後に決める
+# 計測（2026-11-27、windows-latest、cargo-mutants 27.1.0 + nextest、対象 4 ファイルの全 44 件を 4 シャード）:
+# - 44 件中 caught 18・missed 22・unviable 4、スコア 45.0%。シャード 1 本の所要は 7〜10 分
+# - 内訳: 未変異のビルド 160〜230 秒（キャッシュなし）、1 件あたりビルド約 25 秒＋テスト約 2 秒。
+#   1 本で全件を回すと約 23 分
+# - 生き残り 22 件に等価なミュータントは無く、すべてテストの穴。
+#   SubscriptionEngine::process_event の照合（enabled・plugin 名・イベント種別。AppHandle が要るため
+#   テストが無い）13 件、SubscriptionEngine::reload 1 件、config.rs の serde 既定値
+#   （default_timeout_secs 2 件・default_true 1 件）3 件、実ファイルに触る AppConfig::config_path・load 2 件、
+#   AppHandle と JobScheduler が要る SchedulerManager の reload_all・add_schedule・shutdown 3 件
+#
+# ゲート（MAX_MISSED）の根拠: 差分あたりの生き残りの上限。等価なミュータントは 0 件と実測したので、
+# 余裕は小さくてよい。対象ファイルを変えた過去のコミットの差分（ミュータントが掛かる 10 件）を今の
+# テストに当てると、生き残りは 6・1・1・1・13・1・1・4・1・2 件（中央値 1）。2 件を超える 3 件は
+# どれも上の既知の穴（process_event の照合、既定値）に触れる変更で、そこでゲートが落ちるのは意図どおり
+# （テストを足すか、照合を AppHandle 非依存の関数に切り出して確かめる）。よって実測の中央値 1 に 1 件の
+# 余裕を足して 2 とする。等価なものが重なって超えたら、PR に理由を書いて上限を見直す。
+# #[mutants::skip]（関数単位で外れて検出力を失う）は使わない
 #
 # 対象のソースか、ミューテーションテストの設定・ワークフロー・スクリプトを変えたときだけ動かす
 # （対象に触らない PR で Windows ランナーの時間を使わない）。差分の判定は plan でも行うので、
@@ -68,7 +84,7 @@ env:
   CARGO_NEXTEST_VERSION: 0.9.152
   CARGO_NEXTEST_SHA256_WINDOWS: 0384fc89a5a547d4fd5e183fcc101d31dba2837feafd8e64d5ea003a0ddb1941
   # 差分に掛かるミュータントの生き残りの上限（根拠は冒頭のコメント）。
-  MAX_MISSED: 0
+  MAX_MISSED: 2
 
 jobs:
   plan:
