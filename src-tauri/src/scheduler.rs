@@ -179,6 +179,16 @@ fn retry_delay_secs(attempt: u32) -> u32 {
 mod tests {
     use super::*;
 
+    // PROBE（ゲートの検証用の一時変更、revert する）
+    #[test]
+    fn retry_delay_secs_grows_then_caps() {
+        assert_eq!(retry_delay_secs(0), 0);
+        assert_eq!(retry_delay_secs(1), 10);
+        assert_eq!(retry_delay_secs(2), 20);
+        assert_eq!(retry_delay_secs(3), 60);
+        assert_eq!(retry_delay_secs(4), 60);
+    }
+
     #[test]
     fn normalize_5field_cron_adds_seconds() {
         assert_eq!(
