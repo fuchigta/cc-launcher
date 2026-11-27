@@ -165,57 +165,9 @@ fn normalize_cron_expression(expr: &str) -> Result<String, String> {
     }
 }
 
-// PROBE（ゲートの検証用の一時変更、revert する）
-#[allow(dead_code)]
-fn retry_delay_secs(attempt: u32) -> u32 {
-    if attempt >= 3 {
-        60
-    } else {
-        attempt * 10
-    }
-}
-
-// PROBE（ゲートの合算の検証用の一時変更、revert する）
-#[allow(dead_code)]
-fn window_slots(start: u32, end: u32, step: u32) -> u32 {
-    if step == 0 || end <= start {
-        return 0;
-    }
-    let count = (end - start) / step + 1;
-    if count > 100 {
-        100
-    } else {
-        count * step
-    }
-}
-
-// PROBE（ゲートの合算の検証用の一時変更、revert する）
-#[allow(dead_code)]
-fn probe_enabled() -> bool {
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // PROBE（ゲートの検証用の一時変更、revert する）
-    #[test]
-    fn retry_delay_secs_grows_then_caps() {
-        assert_eq!(retry_delay_secs(0), 0);
-        assert_eq!(retry_delay_secs(1), 10);
-        assert_eq!(retry_delay_secs(2), 20);
-        assert_eq!(retry_delay_secs(3), 60);
-        assert_eq!(retry_delay_secs(4), 60);
-    }
-
-    // PROBE（ゲートの合算の検証用の一時変更、revert する）
-    #[test]
-    fn window_slots_basic() {
-        assert_eq!(window_slots(0, 10, 0), 0);
-        assert_eq!(window_slots(10, 5, 2), 0);
-        assert_eq!(window_slots(2, 10, 4), 12);
-    }
 
     #[test]
     fn normalize_5field_cron_adds_seconds() {
