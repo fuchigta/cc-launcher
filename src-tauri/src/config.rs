@@ -174,6 +174,34 @@ mod tests {
         assert!(config.recent_directories.is_empty());
     }
 
+    #[test]
+    fn missing_timeout_secs_defaults_to_3600() {
+        let json = r#"{"shortcut":"Ctrl+Space","terminal":"Pwsh"}"#;
+        let config: AppConfig = serde_json::from_str(json).unwrap();
+
+        assert_eq!(config.timeout_secs, 3600);
+    }
+
+    #[test]
+    fn missing_enable_flags_default_to_true() {
+        let json = r#"{"shortcut":"Ctrl+Space","terminal":"Pwsh"}"#;
+        let config: AppConfig = serde_json::from_str(json).unwrap();
+
+        assert!(config.enable_on_startup);
+        assert!(config.enable_context_menu);
+    }
+
+    #[test]
+    fn config_path_is_cc_launcher_config_json() {
+        let path = AppConfig::config_path();
+
+        assert!(
+            path.ends_with(std::path::Path::new("cc-launcher").join("config.json")),
+            "unexpected config path: {}",
+            path.display()
+        );
+    }
+
     mod props {
         use super::super::*;
         use proptest::collection::vec;
