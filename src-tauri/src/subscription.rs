@@ -27,20 +27,10 @@ impl SubscriptionEngine {
         app_handle: &tauri::AppHandle,
     ) {
         let subs = self.subscriptions.read().await;
-        for sub in subs.iter() {
-            if !sub.enabled {
-                continue;
-            }
-
-            let name_match = sub.plugin_name == "*"
-                || sub.plugin_name == plugin_id
-                || sub.plugin_name == plugin_name;
-            let type_match = sub.event_type == "*" || sub.event_type == event.event_type;
-
-            if !name_match || !type_match {
-                continue;
-            }
-
+        for sub in subs
+            .iter()
+            .filter(|sub| subscription_matches(sub, plugin_id, plugin_name, &event.event_type))
+        {
             let prompt = expand_template(&sub.prompt_template, &event.data);
             let wd = sub.working_dir.clone();
             let args = sub.claude_args.clone();
@@ -58,6 +48,25 @@ impl SubscriptionEngine {
             });
         }
     }
+}
+
+/// Whether `sub` should fire for an event of `event_type` from the plugin
+/// identified by `plugin_id` / `plugin_name`. `"*"` matches any plugin or event type.
+fn subscription_matches(
+    sub: &SubscriptionConfig,
+    plugin_id: &str,
+    plugin_name: &str,
+    event_type: &str,
+) -> bool {
+    if !sub.enabled {
+        return false;
+    }
+
+    let name_match =
+        sub.plugin_name == "*" || sub.plugin_name == plugin_id || sub.plugin_name == plugin_name;
+    let type_match = sub.event_type == "*" || sub.event_type == event_type;
+
+    name_match && type_match
 }
 
 fn expand_template(template: &str, data: &serde_json::Value) -> String {
@@ -79,6 +88,113 @@ fn expand_template(template: &str, data: &serde_json::Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn subscription(plugin_name: &str, event_type: &str, enabled: bool) -> SubscriptionConfig {
+        SubscriptionConfig {
+            id: "sub-1".to_string(),
+            name: "test".to_string(),
+            plugin_name: plugin_name.to_string(),
+            event_type: event_type.to_string(),
+            prompt_template: "prompt".to_string(),
+            working_dir: None,
+            claude_args: Vec::new(),
+            enabled,
+        }
+    }
+
+    #[test]
+    fn matches_by_plugin_name_and_event_type() {
+        let sub = subscription("Folder Watcher", "file_changed", true);
+        assert!(subscription_matches(
+            &sub,
+            "folder-watcher",
+            "Folder Watcher",
+            "file_changed"
+        ));
+    }
+
+    #[test]
+    fn matches_by_plugin_id() {
+        let sub = subscription("folder-watcher", "file_changed", true);
+        assert!(subscription_matches(
+            &sub,
+            "folder-watcher",
+            "Folder Watcher",
+            "file_changed"
+        ));
+    }
+
+    #[test]
+    fn wildcard_plugin_matches_any_plugin() {
+        let sub = subscription("*", "file_changed", true);
+        assert!(subscription_matches(
+            &sub,
+            "folder-watcher",
+            "Folder Watcher",
+            "file_changed"
+        ));
+    }
+
+    #[test]
+    fn wildcard_event_type_matches_any_event_type() {
+        let sub = subscription("folder-watcher", "*", true);
+        assert!(subscription_matches(
+            &sub,
+            "folder-watcher",
+            "Folder Watcher",
+            "file_changed"
+        ));
+    }
+
+    #[test]
+    fn disabled_subscription_does_not_match() {
+        let sub = subscription("*", "*", false);
+        assert!(!subscription_matches(
+            &sub,
+            "folder-watcher",
+            "Folder Watcher",
+            "file_changed"
+        ));
+    }
+
+    #[test]
+    fn other_plugin_does_not_match() {
+        let sub = subscription("imap-watcher", "*", true);
+        assert!(!subscription_matches(
+            &sub,
+            "folder-watcher",
+            "Folder Watcher",
+            "file_changed"
+        ));
+    }
+
+    #[test]
+    fn other_event_type_does_not_match() {
+        let sub = subscription("*", "mail_received", true);
+        assert!(!subscription_matches(
+            &sub,
+            "folder-watcher",
+            "Folder Watcher",
+            "file_changed"
+        ));
+    }
+
+    #[tokio::test]
+    async fn reload_replaces_subscriptions() {
+        let mut old = subscription("*", "*", true);
+        old.id = "old".to_string();
+        let mut new_a = subscription("*", "*", true);
+        new_a.id = "new-a".to_string();
+        let mut new_b = subscription("*", "*", true);
+        new_b.id = "new-b".to_string();
+
+        let engine = SubscriptionEngine::new(vec![old]);
+        engine.reload(vec![new_a, new_b]).await;
+
+        let subs = engine.subscriptions.read().await;
+        let ids: Vec<&str> = subs.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, vec!["new-a", "new-b"]);
+    }
 
     #[test]
     fn expand_template_basic() {
