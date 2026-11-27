@@ -63,6 +63,24 @@ pnpm hook:final     # 静的解析全チェック
 pnpm ts:generate    # Rust型からTypeScript型定義を生成
 ```
 
+**ミューテーションテスト（cargo-mutants）**
+
+テストがコードの変化（ミュータント）を検出できるかを確かめる。対象は `src-tauri/.cargo/mutants.toml` の `examine_globs`（scheduler / config / models / subscription）だけ。CI（`.github/workflows/mutation.yml`）は main との差分に掛かるミュータントだけを windows-latest で試す（メインクレートは Linux でビルドできない）。
+
+```bash
+# 道具（CI と同じ版。Cargo.toml の依存には入れない）
+cargo install --locked cargo-mutants@27.1.0 cargo-nextest@0.9.152
+
+# 作業中の変更に掛かるミュータントを数えて試す（src-tauri/ で実行。差分は --relative=src-tauri が必須で、
+# リポジトリ根からのパスのままだと無言で 0 件になる）
+cd src-tauri
+git diff --relative=src-tauri origin/main...HEAD > /tmp/mutants.diff
+cargo mutants --list --in-diff /tmp/mutants.diff
+cargo mutants --in-diff /tmp/mutants.diff --in-place
+```
+
+`--in-place` は、木をコピーすると .gitignore された `plugins/bin/*.exe` が無くなりビルドできないため（作業ツリーを直接書き換えて戻すので、中断したら `git diff` で残りが無いか確かめる）。結果は `src-tauri/mutants.out/`（`missed.txt` が生き残り、`outcomes.json` が集計）。ゲートは差分の生き残りが `MAX_MISSED` を超えると落ちる。落ちたらテストを足す。テストで殺せない等価ミュータントなら PR に理由を書いて上限を見直す（`#[mutants::skip]` は関数単位で検出力を失うので使わない）。
+
 **UI確認（playwright-cli）**
 
 `pnpm tauri dev` 起動後、`playwright-cli` でTauri APIモックを注入してブラウザ上で確認する。
