@@ -14,3 +14,6 @@
 
 # Built context menu handler DLL
 /context-menu-handler/bin/
+
+# cargo-mutants output
+/mutants.out*/

@@ -1,0 +1,214 @@
+name: Mutation
+
+# ミューテーションテスト（cargo-mutants）。テストが変更したコードの誤りを検出できるかを確かめる。
+# 対象は src-tauri/.cargo/mutants.toml の examine_globs（純粋なロジックでテストが厚いファイルだけ）。
+# 全件ではなく、比較元との差分に掛かるミュータントだけを試す（--in-diff）。
+# 回し方と結果の読み方は CLAUDE.md の「ミューテーションテスト」を参照。
+#
+# - 実行環境: ミュータントを試すシャードは windows-latest。メインクレートは winreg（Windows 以外は
+#   compile_error!）・windows 0.61（windows-future が Linux でビルドできない）・std::os::windows に
+#   条件なしで依存し、Linux ではビルドできない（2026-11-27 に確認）。plan と gate はビルドしない
+#   （--list はソースを読むだけ）ので ubuntu-latest で回す
+# - 版: cargo-mutants 27.1.0（MIT）と、テストを回す cargo-nextest 0.9.152（MIT OR Apache-2.0）。
+#   Cargo.toml の依存には入れず、公式リリースのバイナリを sha256 で検証して使う
+#   （cargo install だと CI のたびに数分のビルドになる）
+# - 比較元: pull_request は origin/<ベースブランチ>（git diff origin/main...HEAD）、
+#   main への push は push 前の main（github.event.before）
+# - 差分に掛かるミュータントが 0 件（対象外のファイルだけの変更、テストやコメントだけの変更、
+#   差分なし）のときは、何も試さずに成功として扱う。cargo-mutants 自身も空の差分では
+#   全件実行にせず 0 件のまま終了コード 0 で終わる
+# - 空振りの防止: plan で数えたミュータント数と、各シャードが実際に試した数の合計が一致しない
+#   ときはゲートを落とす。差分が木と合わない（cargo-mutants の終了コード 5）ときに --list が
+#   何も出さず 0 件に見えるため、plan は pipefail で失敗させる。差分のパスは src-tauri/ からの
+#   相対にする（mutants-diff.sh。リポジトリの根からのパスだと無言で 0 件になる）
+# - シャード: 10 件ごとに 1 つ、最大 4 つ（round-robin）。cargo-mutants の文書はシャードあたり
+#   10 件以上を勧めている。所要時間は下の計測を参照
+#
+# 計測（2026-11-27、windows-latest、cargo-mutants 27.1.0 + nextest、対象 4 ファイルの全 44 件を 4 シャード）:
+# - 44 件中 caught 18・missed 22・unviable 4、スコア 45.0%。シャード 1 本の所要は 7〜10 分
+# - 内訳: 未変異のビルド 160〜230 秒（キャッシュなし）、1 件あたりビルド約 25 秒＋テスト約 2 秒。
+#   1 本で全件を回すと約 23 分
+# - キャッシュが効いた 2 回目以降は未変異のビルドが約 55 秒。差分 5 件（1 シャード）でジョブ約 4 分、
+#   22 件（3 シャード）で各 4〜6 分
+# - 生き残り 22 件に等価なミュータントは無く、すべてテストの穴。
+#   SubscriptionEngine::process_event の照合（enabled・plugin 名・イベント種別。AppHandle が要るため
+#   テストが無い）13 件、SubscriptionEngine::reload 1 件、config.rs の serde 既定値
+#   （default_timeout_secs 2 件・default_true 1 件）3 件、実ファイルに触る AppConfig::config_path・load 2 件、
+#   AppHandle と JobScheduler が要る SchedulerManager の reload_all・add_schedule・shutdown 3 件
+#
+# ゲート（MAX_MISSED）の根拠: 差分あたりの生き残りの上限。等価なミュータントは 0 件と実測したので、
+# 余裕は小さくてよい。対象ファイルを変えた過去のコミットの差分（ミュータントが掛かる 10 件）を今の
+# テストに当てると、生き残りは 6・1・1・1・13・1・1・4・1・2 件（中央値 1）。2 件を超える 3 件は
+# どれも上の既知の穴（process_event の照合、既定値）に触れる変更で、そこでゲートが落ちるのは意図どおり
+# （テストを足すか、照合を AppHandle 非依存の関数に切り出して確かめる）。よって実測の中央値 1 に 1 件の
+# 余裕を足して 2 とする。等価なものが重なって超えたら、PR に理由を書いて上限を見直す。
+# #[mutants::skip]（関数単位で外れて検出力を失う）は使わない
+#
+# 対象のソースか、ミューテーションテストの設定・ワークフロー・スクリプトを変えたときだけ動かす
+# （対象に触らない PR で Windows ランナーの時間を使わない）。差分の判定は plan でも行うので、
+# ここは粗い絞り込み。対象を変えたら examine_globs とここの両方を直す。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/src/scheduler.rs'
+      - 'src-tauri/src/config.rs'
+      - 'src-tauri/src/models.rs'
+      - 'src-tauri/src/subscription.rs'
+      - 'src-tauri/.cargo/mutants.toml'
+      - '.github/workflows/mutation.yml'
+      - '.github/scripts/install-mutants-tools.sh'
+      - '.github/scripts/mutants-*.sh'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src-tauri/src/scheduler.rs'
+      - 'src-tauri/src/config.rs'
+      - 'src-tauri/src/models.rs'
+      - 'src-tauri/src/subscription.rs'
+      - 'src-tauri/.cargo/mutants.toml'
+      - '.github/workflows/mutation.yml'
+      - '.github/scripts/install-mutants-tools.sh'
+      - '.github/scripts/mutants-*.sh'
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # バージョンを上げるときは sha256 も更新する（https://github.com/sourcefrog/cargo-mutants/releases の
+  # cargo-mutants-x86_64-unknown-linux-gnu.tar.gz と cargo-mutants-x86_64-pc-windows-msvc.zip の sha256）。
+  CARGO_MUTANTS_VERSION: 27.1.0
+  CARGO_MUTANTS_SHA256_LINUX: dfe6dc37d0342c891d2829b5a695aa57c2d0edecef7e7d0399a30cc6e206411e
+  CARGO_MUTANTS_SHA256_WINDOWS: 2a2f00e47d4b458262a41501b0820aa26015fd35779903d2c8b30b2993f36791
+  # 同様に https://github.com/nextest-rs/nextest/releases の
+  # cargo-nextest-<版>-x86_64-pc-windows-msvc.tar.gz の sha256。
+  CARGO_NEXTEST_VERSION: 0.9.152
+  CARGO_NEXTEST_SHA256_WINDOWS: 0384fc89a5a547d4fd5e183fcc101d31dba2837feafd8e64d5ea003a0ddb1941
+  # 差分に掛かるミュータントの生き残りの上限（根拠は冒頭のコメント）。
+  MAX_MISSED: 2
+
+jobs:
+  plan:
+    name: mutants (plan)
+    runs-on: ubuntu-latest
+    outputs:
+      count: ${{ steps.list.outputs.count }}
+      shards: ${{ steps.list.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-mutants
+        run: .github/scripts/install-mutants-tools.sh --mutants-only
+
+      - name: Diff
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: .github/scripts/mutants-diff.sh "$BASE" > src-tauri/git.diff
+
+      - name: List mutants in diff
+        id: list
+        working-directory: src-tauri
+        run: |
+          # 差分が木と合わない（終了コード 5）などの失敗を tee で隠さない
+          set -o pipefail
+          cargo mutants --list --in-diff git.diff | tee mutants-list.txt
+          count=$(wc -l < mutants-list.txt)
+          # 10 件ごとに 1 シャード、最大 4。0 件のときはシャードを作らない
+          n=$(( (count + 9) / 10 )); (( n > 4 )) && n=4
+          shards=$(jq -cn --argjson n "$n" '[range($n)]')
+          echo "差分に掛かるミュータント: ${count} 件（シャード ${n} 個）"
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+          echo "shards=${shards}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mutants-diff
+          path: |
+            src-tauri/git.diff
+            src-tauri/mutants-list.txt
+
+  mutants:
+    name: mutants (shard ${{ matrix.shard }})
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - name: Configure git line endings
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          shared-key: mutants
+
+      - name: Install cargo-mutants and cargo-nextest
+        run: .github/scripts/install-mutants-tools.sh
+
+      # tauri-build が tauri.conf.json の resources を探すため、ci.yml と同じ空のスタブを置く
+      - name: Create plugin binary stubs
+        run: |
+          mkdir -p src-tauri/plugins/bin src-tauri/cli/bin
+          touch src-tauri/plugins/bin/folder-watcher.exe src-tauri/plugins/bin/imap-watcher.exe
+          touch src-tauri/cli/bin/cc-launcher-cli.exe
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mutants-diff
+          path: src-tauri
+
+      # 生き残り（終了コード 2）や時間切れ（3）でもここでは止めず、件数の判定は gate で行う。
+      # 未変異のテストが落ちる（4）などそれ以外の失敗は、このジョブを落とす。
+      # --in-place: コピーした木では .gitignore されたスタブが無くビルドできず、キャッシュも効かない
+      - name: Mutants
+        working-directory: src-tauri
+        run: |
+          set +e
+          cargo mutants --in-diff git.diff --in-place --no-shuffle \
+            --shard ${{ matrix.shard }}/${{ strategy.job-total }} --sharding round-robin
+          code=$?
+          case "$code" in
+            0|2|3) exit 0 ;;
+            *) echo "cargo-mutants が終了コード ${code} で失敗した"; exit "$code" ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutants-out-${{ matrix.shard }}
+          path: src-tauri/mutants.out
+
+  gate:
+    name: mutants (gate)
+    needs: [plan, mutants]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        if: needs.plan.outputs.count != '0'
+        with:
+          pattern: mutants-out-*
+
+      - name: Gate
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          MUTANTS_RESULT: ${{ needs.mutants.result }}
+          EXPECTED: ${{ needs.plan.outputs.count }}
+        run: .github/scripts/mutants-gate.sh
